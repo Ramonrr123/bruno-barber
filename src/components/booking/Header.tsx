@@ -7,12 +7,19 @@ export function Header() {
       animate={{ opacity: 1, y: 0 }}
       className="text-center py-6 px-4"
     >
-      <div className="flex items-center justify-center gap-3 mb-2">
-        <span className="text-4xl">🐸</span>
-        <h1 className="text-2xl font-bold text-foreground">
-          Barbearia do <span className="text-primary neon-text">Sapo</span>
-        </h1>
-      </div>
+      <img 
+        src="/logo.png" 
+        alt="Logo Barbearia Sapo do Corte - Agendamento Online"
+        className="w-32 md:w-40 mx-auto mb-4 drop-shadow-[0_0_15px_rgba(57,255,20,0.5)]"
+        style={{ 
+          display: 'block'
+        }}
+        onError={(e) => {
+          // Fallback caso a imagem não carregue
+          const target = e.target as HTMLImageElement;
+          target.style.display = 'none';
+        }}
+      />
       <p className="text-muted-foreground text-sm">
         Agende seu horário em segundos
       </p>
