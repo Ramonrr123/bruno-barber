@@ -1,0 +1,250 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+export default function Login() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Verificar se já está autenticado
+    const checkSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          navigate('/admin', { replace: true });
+        }
+      } catch (error) {
+        console.error('Error checking session:', error);
+      } finally {
+        setCheckingSession(false);
+      }
+    };
+
+    checkSession();
+
+    // Listener para mudanças de autenticação
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        navigate('/admin', { replace: true });
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [navigate]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      // Debug: verificar se as variáveis de ambiente estão configuradas
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      
+      if (!supabaseUrl || !supabaseKey) {
+        console.error('Variáveis de ambiente não configuradas:', {
+          url: !!supabaseUrl,
+          key: !!supabaseKey
+        });
+        toast.error('Erro de configuração: Verifique as variáveis de ambiente do Supabase');
+        return;
+      }
+
+      // Limpar email de espaços e converter para lowercase
+      const cleanEmail = email.trim().toLowerCase();
+      
+      console.log('Tentando fazer login com:', { email: cleanEmail });
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password: password.trim(),
+      });
+
+      if (error) {
+        console.error('Erro do Supabase:', {
+          message: error.message,
+          status: error.status,
+          name: error.name
+        });
+        throw error;
+      }
+
+      console.log('Login bem-sucedido:', { session: !!data.session });
+
+      if (data.session) {
+        toast.success('Login realizado com sucesso!');
+        navigate('/admin', { replace: true });
+      } else {
+        toast.error('Sessão não criada. Tente novamente.');
+      }
+    } catch (error: any) {
+      console.error('Login error completo:', error);
+      
+      // Mensagem de erro mais clara e específica
+      let errorMessage = 'Erro ao fazer login. Verifique suas credenciais.';
+      
+      if (error.message?.includes('Invalid login credentials')) {
+        errorMessage = 'Email ou senha incorretos. No Supabase Dashboard → Authentication → Users, edite o usuário e defina uma nova senha, ou use "Send Password Reset Email".';
+      } else if (error.message?.includes('Email not confirmed')) {
+        errorMessage = 'Email não confirmado. Verifique seu email ou ative "Auto Confirm User" no Supabase.';
+      } else if (error.message?.includes('User not found')) {
+        errorMessage = 'Usuário não encontrado. Verifique se o usuário foi criado corretamente no Supabase.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-md"
+      >
+        {/* Logo */}
+        <div className="flex justify-center mb-8">
+          <div className="relative">
+            <img
+              src="/logo-sapo.png"
+              alt="Logo Sapo"
+              className="h-24 w-24 object-contain"
+              onError={(e) => {
+                // Fallback se a imagem não existir
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                const fallback = target.nextElementSibling as HTMLElement;
+                if (fallback) {
+                  fallback.style.display = 'block';
+                }
+              }}
+            />
+            <div className="text-6xl hidden absolute inset-0 flex items-center justify-center">🐸</div>
+          </div>
+        </div>
+
+        {/* Form */}
+        <div className="glass-card rounded-xl p-8 border border-border">
+          <h1 className="text-2xl font-bold text-foreground mb-6 text-center">
+            Login Administrativo
+          </h1>
+          
+          <div className="mb-4 p-3 bg-primary/10 border border-primary/30 rounded-lg">
+            <p className="text-xs text-muted-foreground text-center">
+              💡 <strong>Primeira vez?</strong> Crie um usuário no painel do Supabase (Authentication → Users)
+            </p>
+            <p className="text-xs text-muted-foreground text-center mt-1">
+              ⚠️ <strong>Importante:</strong> Ao criar, marque "Auto Confirm User" para não precisar confirmar email
+            </p>
+            <div className="flex gap-2 mt-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  localStorage.clear();
+                  toast.success('Cache limpo! Tente fazer login novamente.');
+                }}
+                className="text-xs text-primary hover:underline flex-1"
+              >
+                🔄 Limpar cache
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const email = (document.getElementById('email') as HTMLInputElement)?.value;
+                  if (!email) {
+                    toast.error('Digite o email primeiro');
+                    return;
+                  }
+                  try {
+                    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+                      redirectTo: `${window.location.origin}/login`,
+                    });
+                    if (error) throw error;
+                    toast.success('Email de reset enviado! Verifique sua caixa de entrada.');
+                  } catch (error: any) {
+                    toast.error(error.message || 'Erro ao enviar email de reset');
+                  }
+                }}
+                className="text-xs text-primary hover:underline flex-1"
+              >
+                🔑 Resetar senha
+              </button>
+            </div>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                placeholder="seu@email.com"
+                disabled={isLoading}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-foreground mb-2">
+                Senha
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                placeholder="••••••••"
+                disabled={isLoading}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full bg-primary text-primary-foreground font-semibold py-3 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Entrando...
+                </>
+              ) : (
+                'Entrar'
+              )}
+            </button>
+          </form>
+        </div>
+      </motion.div>
+    </div>
+  );
+}

@@ -29,5 +29,5 @@ export interface Appointment {
   appointment_date: string;
   start_time: string;
   end_time: string;
-  status: 'scheduled' | 'completed' | 'cancelled' | 'blocked';
+  status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'blocked' | 'no_show';
 }

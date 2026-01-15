@@ -66,13 +66,19 @@ export function DateTimeSelection({
       
       try {
         // Fetch existing appointments for the selected date
+        console.log('Buscando disponibilidade para:', dateStr);
         const { data: appointments, error } = await supabase
           .from('appointments')
           .select('start_time, end_time')
           .eq('appointment_date', dateStr)
-          .in('status', ['scheduled', 'blocked']);
+          .in('status', ['scheduled', 'confirmed', 'blocked']);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Erro ao buscar agendamentos:', error);
+          throw error;
+        }
+        
+        console.log('Agendamentos encontrados para verificação:', appointments);
 
         // Check each slot for conflicts
         const slotsWithAvailability: TimeSlot[] = allSlots.map((time) => {

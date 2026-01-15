@@ -5,13 +5,46 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
+// Verificar se as variáveis de ambiente estão configuradas
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  console.error('⚠️ Variáveis de ambiente do Supabase não configuradas!');
+  console.error('Configure VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY no arquivo .env');
+  console.error('URL configurada:', !!SUPABASE_URL, SUPABASE_URL);
+  console.error('KEY configurada:', !!SUPABASE_PUBLISHABLE_KEY, SUPABASE_PUBLISHABLE_KEY ? '***' + SUPABASE_PUBLISHABLE_KEY.slice(-4) : 'não configurada');
+} else {
+  console.log('✅ Supabase configurado:', {
+    url: SUPABASE_URL,
+    key: '***' + SUPABASE_PUBLISHABLE_KEY.slice(-4)
+  });
+}
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  auth: {
-    storage: localStorage,
-    persistSession: true,
-    autoRefreshToken: true,
+// Validar configuração antes de criar o cliente
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  console.error('❌ ERRO: Variáveis de ambiente do Supabase não configuradas!');
+  console.error('URL:', SUPABASE_URL || 'NÃO CONFIGURADA');
+  console.error('KEY:', SUPABASE_PUBLISHABLE_KEY ? 'Configurada' : 'NÃO CONFIGURADA');
+  console.error('');
+  console.error('📝 SOLUÇÃO:');
+  console.error('1. Crie um arquivo .env na raiz do projeto');
+  console.error('2. Adicione:');
+  console.error('   VITE_SUPABASE_URL=https://seu-projeto.supabase.co');
+  console.error('   VITE_SUPABASE_PUBLISHABLE_KEY=sua-chave-aqui');
+  console.error('3. Reinicie o servidor (npm run dev)');
+  console.error('');
+  console.error('Veja CONFIGURACAO_SUPABASE.md para mais detalhes');
+}
+
+export const supabase = createClient<Database>(
+  SUPABASE_URL || 'https://placeholder.supabase.co',
+  SUPABASE_PUBLISHABLE_KEY || 'placeholder-key',
+  {
+    auth: {
+      storage: localStorage,
+      persistSession: true,
+      autoRefreshToken: true,
+    }
   }
-});
+);

@@ -70,39 +70,110 @@ export function ClientInfoForm({
       const dateStr = format(date, 'yyyy-MM-dd');
       
       // Double-check availability before inserting
-      const { data: conflicts, error: checkError } = await supabase
+      console.log('Verificando conflitos para:', { dateStr, time, endTime });
+      const { data: existingAppointments, error: checkError } = await supabase
         .from('appointments')
-        .select('id')
+        .select('start_time, end_time')
         .eq('appointment_date', dateStr)
-        .in('status', ['scheduled', 'blocked'])
-        .lt('start_time', endTime)
-        .gt('end_time', time);
+        .in('status', ['scheduled', 'confirmed', 'blocked']);
 
-      if (checkError) throw checkError;
+      if (checkError) {
+        console.error('Erro ao verificar disponibilidade:', checkError);
+        throw checkError;
+      }
       
-      if (conflicts && conflicts.length > 0) {
+      console.log('Agendamentos existentes encontrados:', existingAppointments);
+      
+      // Verificar conflitos manualmente
+      const hasConflict = existingAppointments?.some((apt) => {
+        const aptStart = apt.start_time;
+        const aptEnd = apt.end_time;
+        
+        // Verifica se há sobreposição de horários
+        return (
+          (time >= aptStart && time < aptEnd) ||
+          (endTime > aptStart && endTime <= aptEnd) ||
+          (time <= aptStart && endTime >= aptEnd)
+        );
+      });
+      
+      if (hasConflict) {
         toast.error('Este horário já foi reservado. Escolha outro horário.');
         onBack();
         return;
       }
 
       // Insert the appointment
-      const { error: insertError } = await supabase
-        .from('appointments')
-        .insert({
-          client_name: name.trim(),
-          client_phone: phone.replace(/\D/g, ''),
-          service_type: service.name,
-          appointment_date: dateStr,
-          start_time: time,
-          end_time: endTime,
-          status: 'scheduled',
-        });
+      // Preparar dados exatamente como o banco espera
+      const appointmentData = {
+        client_name: name.trim(),
+        client_phone: phone.replace(/\D/g, ''),
+        service_type: service.name,
+        appointment_date: dateStr,
+        start_time: time,
+        end_time: endTime,
+        status: 'confirmed' as const,
+      };
 
-      if (insertError) throw insertError;
+      // Validar dados antes de enviar
+      if (!appointmentData.client_name || !appointmentData.client_phone || !appointmentData.service_type) {
+        toast.error('Preencha todos os campos obrigatórios');
+        return;
+      }
+
+      console.log('Salvando agendamento no banco:', appointmentData);
+      console.log('Tipos dos dados:', {
+        client_name: typeof appointmentData.client_name,
+        client_phone: typeof appointmentData.client_phone,
+        service_type: typeof appointmentData.service_type,
+        appointment_date: typeof appointmentData.appointment_date,
+        start_time: typeof appointmentData.start_time,
+        end_time: typeof appointmentData.end_time,
+        status: typeof appointmentData.status,
+      });
+
+      const { data: insertedData, error: insertError } = await supabase
+        .from('appointments')
+        .insert(appointmentData)
+        .select();
+
+      if (insertError) {
+        console.error('❌ ERRO AO SALVAR AGENDAMENTO:', insertError);
+        console.error('📋 Dados que tentaram ser salvos:', appointmentData);
+        console.error('🔍 Detalhes completos do erro:', {
+          message: insertError.message,
+          code: insertError.code,
+          details: insertError.details,
+          hint: insertError.hint,
+        });
+        
+        // Mensagem de erro mais específica e útil
+        let errorMessage = 'Erro ao salvar agendamento.';
+        
+        if (insertError.message?.includes('column') && insertError.message?.includes('does not exist')) {
+          const columnMatch = insertError.message.match(/column "(\w+)" does not exist/);
+          const columnName = columnMatch ? columnMatch[1] : 'desconhecida';
+          errorMessage = `Erro: Coluna "${columnName}" não existe no banco. Execute o SQL de correção no Supabase.`;
+        } else if (insertError.message?.includes('null value') && insertError.message?.includes('violates not-null constraint')) {
+          const columnMatch = insertError.message.match(/column "(\w+)" of relation/);
+          const columnName = columnMatch ? columnMatch[1] : 'desconhecida';
+          errorMessage = `Erro: Coluna "${columnName}" está faltando. Verifique a estrutura da tabela.`;
+        } else if (insertError.code === 'PGRST116') {
+          errorMessage = 'Erro: Tabela não encontrada. Verifique a configuração do Supabase.';
+        } else if (insertError.message?.includes('JWT') || insertError.code === 'PGRST301') {
+          errorMessage = 'Erro de autenticação. Verifique as variáveis de ambiente (VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY).';
+        } else {
+          errorMessage = `Erro: ${insertError.message || insertError.code || 'Erro desconhecido'}`;
+        }
+        
+        toast.error(errorMessage);
+        throw insertError;
+      }
+
+      console.log('Agendamento salvo com sucesso!', insertedData);
 
       onUpdateClientInfo(name.trim(), phone);
-      toast.success('Agendamento confirmado!');
+      toast.success('Agendamento confirmado e salvo no banco!');
       onConfirm();
     } catch (error) {
       console.error('Error creating appointment:', error);

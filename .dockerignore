@@ -1,0 +1,56 @@
+# Dependências
+node_modules
+npm-debug.log
+yarn-error.log
+package-lock.json
+
+# Build
+dist
+build
+.vite
+
+# Desenvolvimento
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testes
+coverage
+.nyc_output
+
+# Outros
+*.log
+.cache
+temp
+tmp
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Documentação
+README.md
+*.md
+
+# Supabase local (se houver)
+supabase/.branches
+supabase/.temp
