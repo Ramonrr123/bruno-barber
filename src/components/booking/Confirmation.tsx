@@ -1,8 +1,9 @@
 import { motion } from 'framer-motion';
-import { Check, MessageCircle, Calendar } from 'lucide-react';
+import { Check, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { BookingData } from '@/types/booking';
+import { BARBER_NAME } from '@/data/constants';
 
 interface ConfirmationProps {
   bookingData: BookingData;
@@ -24,19 +25,6 @@ export function Confirmation({ bookingData, onNewBooking }: ConfirmationProps) {
 
   const formattedDate = format(date, "EEEE, d 'de' MMMM", { locale: ptBR });
   const endTime = calculateEndTime(time, service.duration);
-  
-  // WhatsApp message
-  const whatsappMessage = encodeURIComponent(
-    `Olá! Sou ${clientName} e acabei de agendar:\n\n` +
-    `📋 ${service.name}\n` +
-    `📅 ${formattedDate}\n` +
-    `🕐 ${time} às ${endTime}\n\n` +
-    `Confirmado pelo app da Barbearia do Sapo 🐸`
-  );
-  
-  // Replace with actual barbershop number
-  const whatsappNumber = '5511999999999';
-  const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${whatsappMessage}`;
 
   return (
     <motion.div
@@ -94,24 +82,10 @@ export function Confirmation({ bookingData, onNewBooking }: ConfirmationProps) {
           </div>
           <div className="flex items-center gap-2 text-foreground">
             <span className="text-primary text-lg">🕐</span>
-            <span className="font-semibold">{time} - {endTime}</span>
+            <span className="font-semibold">{time} - {endTime} • Profissional: {BARBER_NAME}</span>
           </div>
         </div>
       </motion.div>
-
-      {/* WhatsApp Button */}
-      <motion.a
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.6 }}
-        href={whatsappUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="w-full bg-[#25D366] text-white font-bold py-4 rounded-xl flex items-center justify-center gap-3 transition-all hover:brightness-110"
-      >
-        <MessageCircle className="w-5 h-5" />
-        Abrir WhatsApp do Barbeiro
-      </motion.a>
 
       {/* New Booking */}
       <motion.button

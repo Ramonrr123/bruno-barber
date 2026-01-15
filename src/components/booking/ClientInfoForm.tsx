@@ -7,6 +7,7 @@ import { ptBR } from 'date-fns/locale';
 import { Service } from '@/types/booking';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { BARBER_NAME } from '@/data/constants';
 
 interface ClientInfoFormProps {
   service: Service;
@@ -214,7 +215,7 @@ export function ClientInfoForm({
             📅 {format(date, "EEEE, d 'de' MMMM", { locale: ptBR })}
           </p>
           <p className="text-sm text-primary font-semibold mt-1">
-            🕐 {time} - {calculateEndTime(time, service.duration)}
+            🕐 {time} - {calculateEndTime(time, service.duration)} • Profissional: {BARBER_NAME}
           </p>
         </div>
       </div>

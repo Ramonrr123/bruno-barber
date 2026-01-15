@@ -6,6 +6,7 @@ import { Service, TimeSlot } from '@/types/booking';
 import { DateCarousel } from './DateCarousel';
 import { TimeGrid } from './TimeGrid';
 import { supabase } from '@/integrations/supabase/client';
+import { checkDateAvailability, generateAvailableSlots } from '@/lib/availability';
 
 interface DateTimeSelectionProps {
   service: Service;
@@ -61,12 +62,40 @@ export function DateTimeSelection({
     const fetchAvailability = async () => {
       setIsLoading(true);
       
-      const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const allSlots = generateTimeSlots(service.duration);
-      
       try {
-        // Fetch existing appointments for the selected date
-        console.log('Buscando disponibilidade para:', dateStr);
+        // ============================================
+        // PASSO A e B: Verificar disponibilidade da data
+        // ============================================
+        const availability = await checkDateAvailability(selectedDate, supabase);
+        
+        console.log('Disponibilidade verificada:', {
+          date: format(selectedDate, 'yyyy-MM-dd'),
+          dayOfWeek: selectedDate.getDay(),
+          isAvailable: availability.isAvailable,
+          reason: availability.reason,
+          startTime: availability.startTime,
+          endTime: availability.endTime,
+        });
+        
+        if (!availability.isAvailable) {
+          // Dia não disponível - retornar vazio
+          console.log('Dia não disponível:', availability.reason);
+          setSlots([]);
+          setIsLoading(false);
+          return;
+        }
+
+        if (!availability.startTime || !availability.endTime) {
+          console.error('Horários não definidos para dia disponível');
+          setSlots([]);
+          setIsLoading(false);
+          return;
+        }
+
+        // ============================================
+        // PASSO C: Buscar agendamentos existentes
+        // ============================================
+        const dateStr = format(selectedDate, 'yyyy-MM-dd');
         const { data: appointments, error } = await supabase
           .from('appointments')
           .select('start_time, end_time')
@@ -77,42 +106,23 @@ export function DateTimeSelection({
           console.error('Erro ao buscar agendamentos:', error);
           throw error;
         }
-        
-        console.log('Agendamentos encontrados para verificação:', appointments);
 
-        // Check each slot for conflicts
-        const slotsWithAvailability: TimeSlot[] = allSlots.map((time) => {
-          const slotStart = time;
-          const slotEnd = calculateEndTime(time, service.duration);
-          
-          // Check if this slot conflicts with any existing appointment
-          const hasConflict = appointments?.some((apt) => {
-            const aptStart = apt.start_time;
-            const aptEnd = apt.end_time;
-            
-            // Check for overlap
-            return slotStart < aptEnd && slotEnd > aptStart;
-          });
+        // ============================================
+        // Gerar slots baseado na disponibilidade
+        // ============================================
+        const availableSlots = generateAvailableSlots(
+          availability.startTime!,
+          availability.endTime!,
+          service.duration,
+          appointments || [],
+          selectedDate
+        );
 
-          // Also check if the slot is in the past for today
-          const now = new Date();
-          const isToday = format(now, 'yyyy-MM-dd') === dateStr;
-          const [slotHours, slotMins] = time.split(':').map(Number);
-          const slotDate = new Date(selectedDate);
-          slotDate.setHours(slotHours, slotMins, 0, 0);
-          const isPast = isToday && slotDate <= now;
-
-          return {
-            time,
-            available: !hasConflict && !isPast,
-          };
-        });
-
-        setSlots(slotsWithAvailability);
+        setSlots(availableSlots);
       } catch (error) {
         console.error('Error fetching availability:', error);
-        // Fallback: show all slots as available
-        setSlots(allSlots.map((time) => ({ time, available: true })));
+        // Fallback: retornar vazio em caso de erro
+        setSlots([]);
       } finally {
         setIsLoading(false);
       }

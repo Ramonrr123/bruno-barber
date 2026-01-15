@@ -30,4 +30,16 @@ export interface Appointment {
   start_time: string;
   end_time: string;
   status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'blocked' | 'no_show';
+  admin_notes?: string;
+}
+
+export interface ScheduleOverride {
+  id: string;
+  date: string;
+  is_open: boolean;
+  start_time: string | null;
+  end_time: string | null;
+  reason: string | null;
+  created_at: string;
+  updated_at: string;
 }

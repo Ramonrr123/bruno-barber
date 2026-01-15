@@ -27,8 +27,8 @@ export function TimeGrid({ slots, selectedTime, onSelectTime, isLoading }: TimeG
     );
   }
 
+  // Filtrar apenas os slots disponíveis - não mostrar os agendados/concluídos
   const availableSlots = slots.filter(slot => slot.available);
-  const unavailableSlots = slots.filter(slot => !slot.available);
 
   return (
     <div className="px-4">
@@ -48,7 +48,7 @@ export function TimeGrid({ slots, selectedTime, onSelectTime, isLoading }: TimeG
         </motion.p>
       ) : (
         <div className="grid grid-cols-4 gap-2">
-          {slots.map((slot, index) => {
+          {availableSlots.map((slot, index) => {
             const isSelected = selectedTime === slot.time;
             
             return (
@@ -57,15 +57,12 @@ export function TimeGrid({ slots, selectedTime, onSelectTime, isLoading }: TimeG
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: index * 0.02 }}
-                whileTap={{ scale: slot.available ? 0.95 : 1 }}
-                onClick={() => slot.available && onSelectTime(slot.time)}
-                disabled={!slot.available}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => onSelectTime(slot.time)}
                 className={`h-12 rounded-lg font-medium text-sm transition-all ${
                   isSelected 
                     ? 'bg-primary text-primary-foreground neon-glow' 
-                    : slot.available
-                      ? 'bg-card border border-border hover:border-primary/50 text-foreground'
-                      : 'bg-muted/50 text-muted-foreground/50 cursor-not-allowed line-through'
+                    : 'bg-card border border-border hover:border-primary/50 text-foreground'
                 }`}
               >
                 {slot.time}

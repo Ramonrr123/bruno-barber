@@ -136,7 +136,66 @@ TO authenticated
 USING (auth.role() = 'authenticated');
 
 -- ============================================
--- 6. PERFORMANCE (ÍNDICES)
+-- 6. TABELA SCHEDULE_OVERRIDES (Exceções de Agenda)
+-- ============================================
+
+-- Criar tabela schedule_overrides
+CREATE TABLE IF NOT EXISTS public.schedule_overrides (
+    id UUID NOT NULL DEFAULT uuid_generate_v4() PRIMARY KEY,
+    date DATE NOT NULL UNIQUE,
+    is_open BOOLEAN NOT NULL,
+    start_time TIME,
+    end_time TIME,
+    reason TEXT,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+
+-- Constraint: Se is_open = true, start_time e end_time são obrigatórios
+ALTER TABLE public.schedule_overrides
+ADD CONSTRAINT check_open_times
+CHECK (
+    (is_open = false) OR 
+    (is_open = true AND start_time IS NOT NULL AND end_time IS NOT NULL)
+);
+
+-- Constraint: end_time deve ser maior que start_time quando is_open = true
+ALTER TABLE public.schedule_overrides
+ADD CONSTRAINT check_time_order_override
+CHECK (
+    (is_open = false) OR 
+    (is_open = true AND end_time > start_time)
+);
+
+-- Índice para busca rápida por data
+CREATE INDEX IF NOT EXISTS idx_schedule_overrides_date 
+ON public.schedule_overrides (date);
+
+-- Habilitar RLS na tabela schedule_overrides
+ALTER TABLE public.schedule_overrides ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Leitura pública (necessário para verificar disponibilidade)
+CREATE POLICY "Schedule overrides are viewable by everyone"
+ON public.schedule_overrides
+FOR SELECT
+USING (true);
+
+-- Policy: Apenas authenticated (Admin) pode criar/atualizar/deletar
+CREATE POLICY "Only authenticated users can manage schedule overrides"
+ON public.schedule_overrides
+FOR ALL
+TO authenticated
+USING (auth.role() = 'authenticated')
+WITH CHECK (auth.role() = 'authenticated');
+
+-- Trigger para atualizar updated_at em schedule_overrides
+CREATE TRIGGER update_schedule_overrides_updated_at 
+BEFORE UPDATE ON public.schedule_overrides
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- 7. PERFORMANCE (ÍNDICES)
 -- ============================================
 
 -- Índice para otimizar busca por telefone do cliente
@@ -161,7 +220,7 @@ ON public.appointments (client_phone, appointment_date, status)
 WHERE status IN ('confirmed', 'scheduled');
 
 -- ============================================
--- 7. FUNÇÕES AUXILIARES (Opcional)
+-- 8. FUNÇÕES AUXILIARES (Opcional)
 -- ============================================
 
 -- Função para atualizar updated_at automaticamente (se necessário no futuro)
@@ -180,7 +239,7 @@ FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
 -- ============================================
--- 8. VERIFICAÇÃO FINAL
+-- 9. VERIFICAÇÃO FINAL
 -- ============================================
 
 -- Verificar estrutura das tabelas
@@ -206,6 +265,17 @@ WHERE table_schema = 'public'
 AND table_name = 'appointments'
 ORDER BY ordinal_position;
 
+SELECT 
+    'schedule_overrides' as tabela,
+    column_name,
+    data_type,
+    is_nullable,
+    column_default
+FROM information_schema.columns 
+WHERE table_schema = 'public' 
+AND table_name = 'schedule_overrides'
+ORDER BY ordinal_position;
+
 -- Verificar índices criados
 SELECT 
     tablename,
@@ -213,7 +283,7 @@ SELECT
     indexdef
 FROM pg_indexes
 WHERE schemaname = 'public'
-AND tablename IN ('services', 'appointments')
+AND tablename IN ('services', 'appointments', 'schedule_overrides')
 ORDER BY tablename, indexname;
 
 -- Verificar políticas RLS
@@ -227,5 +297,5 @@ SELECT
     qual
 FROM pg_policies
 WHERE schemaname = 'public'
-AND tablename IN ('services', 'appointments')
+AND tablename IN ('services', 'appointments', 'schedule_overrides')
 ORDER BY tablename, policyname;

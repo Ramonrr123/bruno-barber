@@ -16,7 +16,8 @@ import {
   ChevronLeft,
   ChevronRight,
   UserX,
-  Bell
+  Bell,
+  Calendar
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Appointment } from '@/types/booking';
@@ -29,6 +30,7 @@ import {
   DrawerTitle,
   DrawerDescription,
 } from '@/components/ui/drawer';
+import { ScheduleOverridesManager } from '@/components/admin/ScheduleOverridesManager';
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -57,6 +59,7 @@ export default function Admin() {
   }
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotificationsDrawer, setShowNotificationsDrawer] = useState(false);
+  const [showScheduleOverrides, setShowScheduleOverrides] = useState(false);
 
   // Verificar autenticação
   useEffect(() => {
@@ -102,20 +105,15 @@ export default function Admin() {
         .from('appointments')
         .select('*')
         .eq('appointment_date', dateStr)
-        .in('status', ['scheduled', 'confirmed', 'blocked', 'completed', 'no_show', 'cancelled'])
+        .in('status', ['scheduled', 'confirmed', 'blocked'])
         .order('start_time', { ascending: true });
 
       if (error) throw error;
       
-      // Filtrar cancelamentos: só mostrar se o horário já passou
+      // Filtrar apenas agendamentos ativos (não mostrar completed, cancelled, no_show)
       const filteredData = (data as Appointment[]).filter((apt) => {
-        if (apt.status === 'cancelled') {
-          // Se for cancelado, só mostrar se o horário já passou
-          if (isToday) {
-            const appointmentTime = new Date(`${apt.appointment_date}T${apt.start_time}`);
-            return now > appointmentTime;
-          }
-          // Se não for hoje, não mostrar cancelados
+        // Não mostrar agendamentos finalizados
+        if (apt.status === 'completed' || apt.status === 'cancelled' || apt.status === 'no_show') {
           return false;
         }
         return true;
@@ -425,13 +423,23 @@ export default function Admin() {
     }
   };
 
-  if (checkingAuth) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  // Limpar notificações antigas periodicamente (DEVE estar antes de qualquer return)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNotifications((prev) => {
+        const now = new Date();
+        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        // Remover notificações lidas e muito antigas
+        return prev.filter(n => {
+          if (n.read) return false; // Remover lidas
+          if (n.timestamp < oneDayAgo) return false; // Remover muito antigas
+          return true;
+        });
+      });
+    }, 60000); // Verificar a cada minuto
+
+    return () => clearInterval(interval);
+  }, []);
 
   const unreadCount = notifications.filter(n => !n.read).length;
   
@@ -443,6 +451,31 @@ export default function Admin() {
     );
   };
 
+  // Remover notificações lidas quando o drawer for fechado
+  const handleCloseNotifications = (open: boolean) => {
+    setShowNotificationsDrawer(open);
+    // Quando fechar, remover todas as notificações que foram lidas
+    if (!open) {
+      setNotifications((prev) => {
+        // Remover notificações lidas e também muito antigas (mais de 24 horas)
+        const now = new Date();
+        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        return prev.filter(n => {
+          // Manter apenas não lidas e recentes (menos de 24 horas)
+          return !n.read && n.timestamp > oneDayAgo;
+        });
+      });
+    }
+  };
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background p-4 pb-24">
       <div className="max-w-2xl mx-auto">
@@ -453,6 +486,15 @@ export default function Admin() {
             <h1 className="text-xl font-bold text-foreground">Agenda</h1>
           </div>
           <div className="flex items-center gap-2">
+            {/* Botão de Exceções de Agenda */}
+            <button
+              onClick={() => setShowScheduleOverrides(true)}
+              className="p-2 rounded-lg hover:bg-muted transition-colors"
+              aria-label="Exceções de Agenda"
+              title="Gerenciar exceções de agenda"
+            >
+              <Calendar className="w-5 h-5 text-foreground" />
+            </button>
             {/* Ícone de Notificações */}
             <button
               onClick={handleOpenNotifications}
@@ -772,7 +814,7 @@ export default function Admin() {
         </AnimatePresence>
 
         {/* Drawer de Notificações */}
-        <Drawer open={showNotificationsDrawer} onOpenChange={setShowNotificationsDrawer}>
+        <Drawer open={showNotificationsDrawer} onOpenChange={handleCloseNotifications}>
           <DrawerContent className="max-h-[80vh]">
             <DrawerHeader className="text-left">
               <DrawerTitle className="text-xl font-bold">Notificações</DrawerTitle>
@@ -852,6 +894,12 @@ export default function Admin() {
             )}
           </DrawerContent>
         </Drawer>
+
+        {/* Gerenciador de Exceções de Agenda */}
+        <ScheduleOverridesManager
+          isOpen={showScheduleOverrides}
+          onClose={() => setShowScheduleOverrides(false)}
+        />
       </div>
     </div>
   );
