@@ -11,7 +11,8 @@ import { ScheduleOverride } from '@/types/booking';
 
 // Dias da semana padrão (0 = Domingo, 6 = Sábado)
 // Por padrão: Segunda a Sexta (1-5) e Sábado (6) estão abertos
-export const DEFAULT_OPEN_DAYS = [1, 2, 3, 4, 5, 6]; // Segunda a Sábado
+// Domingo (0) NÃO está incluído - sempre fechado por padrão
+export const DEFAULT_OPEN_DAYS = [1, 2, 3, 4, 5, 6]; // Segunda a Sábado (Domingo = 0 está fechado)
 export const DEFAULT_START_TIME = '09:00';
 export const DEFAULT_END_TIME = '19:00';
 
@@ -102,13 +103,14 @@ export async function checkDateAvailability(
   // ============================================
   // PASSO B: Verificar Regra Global (dias da semana)
   // ============================================
+  // Domingo (0) e outros dias não incluídos em DEFAULT_OPEN_DAYS estão fechados
   if (!DEFAULT_OPEN_DAYS.includes(dayOfWeek)) {
-    // Dia fechado pela regra global
+    // Dia fechado pela regra global (ex: Domingo = 0 não está em DEFAULT_OPEN_DAYS)
     return {
       isAvailable: false,
       startTime: null,
       endTime: null,
-      reason: 'Dia fechado (regra global)',
+      reason: dayOfWeek === 0 ? 'Domingo - fechado' : 'Dia fechado (regra global)',
     };
   }
 
@@ -123,6 +125,9 @@ export async function checkDateAvailability(
 
 /**
  * Gera slots de horário baseado na disponibilidade e agendamentos existentes
+ * 
+ * Gera horários em intervalos de 30 minutos para oferecer mais opções,
+ * verificando se cada slot pode acomodar o serviço completo
  */
 export function generateAvailableSlots(
   startTime: string,
@@ -139,7 +144,14 @@ export function generateAvailableSlots(
   const startMinutes = startHours * 60 + startMins;
   const endMinutes = endHours * 60 + endMins;
   
+  // Intervalo padrão para geração de slots (30 minutos)
+  // Isso oferece mais opções mesmo para serviços longos
+  const SLOT_INTERVAL = 30;
+  
   let currentMinutes = startMinutes;
+  
+  // Gerar slots a cada 30 minutos (ou duração do serviço se for menor que 30min)
+  const interval = Math.min(SLOT_INTERVAL, serviceDuration);
   
   while (currentMinutes + serviceDuration <= endMinutes) {
     const hours = Math.floor(currentMinutes / 60);
@@ -152,12 +164,21 @@ export function generateAvailableSlots(
     const slotEndMins = slotEndMinutes % 60;
     const slotEndTime = `${slotEndHours.toString().padStart(2, '0')}:${slotEndMins.toString().padStart(2, '0')}`;
     
+    // Verificar se o horário de término ultrapassa o horário de fechamento
+    if (slotEndMinutes > endMinutes) {
+      currentMinutes += interval;
+      continue;
+    }
+    
     // Verificar conflitos com agendamentos existentes
     const hasConflict = existingAppointments.some((apt) => {
       const aptStart = apt.start_time;
       const aptEnd = apt.end_time;
       
-      // Verificar sobreposição
+      // Verificar sobreposição de horários
+      // Conflito se: início do slot está dentro do agendamento OU
+      //             fim do slot está dentro do agendamento OU
+      //             slot envolve completamente o agendamento
       return (
         (time < aptEnd && slotEndTime > aptStart)
       );
@@ -175,7 +196,8 @@ export function generateAvailableSlots(
       available: !hasConflict && !isPast,
     });
     
-    currentMinutes += serviceDuration;
+    // Incrementar pelo intervalo (30min ou duração se menor)
+    currentMinutes += interval;
   }
   
   return slots;

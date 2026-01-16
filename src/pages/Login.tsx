@@ -126,23 +126,16 @@ export default function Login() {
       >
         {/* Logo */}
         <div className="flex justify-center mb-8">
-          <div className="relative">
-            <img
-              src="/logo-sapo.png"
-              alt="Logo Sapo"
-              className="h-24 w-24 object-contain"
-              onError={(e) => {
-                // Fallback se a imagem não existir
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
-                const fallback = target.nextElementSibling as HTMLElement;
-                if (fallback) {
-                  fallback.style.display = 'block';
-                }
-              }}
-            />
-            <div className="text-6xl hidden absolute inset-0 flex items-center justify-center">🐸</div>
-          </div>
+          <img
+            src="/logo.png"
+            alt="Logo Barbearia"
+            className="h-24 w-24 object-contain"
+            onError={(e) => {
+              // Fallback se a imagem não existir
+              const target = e.target as HTMLImageElement;
+              target.style.display = 'none';
+            }}
+          />
         </div>
 
         {/* Form */}
@@ -150,50 +143,6 @@ export default function Login() {
           <h1 className="text-2xl font-bold text-foreground mb-6 text-center">
             Login Administrativo
           </h1>
-          
-          <div className="mb-4 p-3 bg-primary/10 border border-primary/30 rounded-lg">
-            <p className="text-xs text-muted-foreground text-center">
-              💡 <strong>Primeira vez?</strong> Crie um usuário no painel do Supabase (Authentication → Users)
-            </p>
-            <p className="text-xs text-muted-foreground text-center mt-1">
-              ⚠️ <strong>Importante:</strong> Ao criar, marque "Auto Confirm User" para não precisar confirmar email
-            </p>
-            <div className="flex gap-2 mt-2">
-              <button
-                type="button"
-                onClick={async () => {
-                  await supabase.auth.signOut();
-                  localStorage.clear();
-                  toast.success('Cache limpo! Tente fazer login novamente.');
-                }}
-                className="text-xs text-primary hover:underline flex-1"
-              >
-                🔄 Limpar cache
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  const email = (document.getElementById('email') as HTMLInputElement)?.value;
-                  if (!email) {
-                    toast.error('Digite o email primeiro');
-                    return;
-                  }
-                  try {
-                    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-                      redirectTo: `${window.location.origin}/login`,
-                    });
-                    if (error) throw error;
-                    toast.success('Email de reset enviado! Verifique sua caixa de entrada.');
-                  } catch (error: any) {
-                    toast.error(error.message || 'Erro ao enviar email de reset');
-                  }
-                }}
-                className="text-xs text-primary hover:underline flex-1"
-              >
-                🔑 Resetar senha
-              </button>
-            </div>
-          </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>

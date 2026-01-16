@@ -7,6 +7,9 @@ import { DateCarousel } from './DateCarousel';
 import { TimeGrid } from './TimeGrid';
 import { supabase } from '@/integrations/supabase/client';
 import { checkDateAvailability, generateAvailableSlots } from '@/lib/availability';
+import { getServiceIcon } from '@/lib/serviceIcons';
+import { formatDuration } from '@/lib/formatDuration';
+import { BARBER_NAME } from '@/data/constants';
 
 interface DateTimeSelectionProps {
   service: Service;
@@ -147,12 +150,20 @@ export function DateTimeSelection({
           <span>Voltar</span>
         </button>
         
-        <div className="glass-card rounded-xl p-4 flex items-center gap-3">
-          <span className="text-2xl">{service.icon}</span>
-          <div>
+        <div className="glass-card rounded-xl p-4 flex items-center gap-3 border border-white/10">
+          <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center border border-white/5 flex-shrink-0">
+            {(() => {
+              const IconComponent = getServiceIcon(service.icon);
+              return <IconComponent className="w-6 h-6 text-primary/80" />;
+            })()}
+          </div>
+          <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-foreground">{service.name}</h3>
             <p className="text-sm text-muted-foreground">
-              {service.duration} min • R$ {service.price}
+              {formatDuration(service.duration)} • <span className="text-primary font-semibold neon-text">R$ {service.price.toFixed(2).replace('.', ',')}</span>
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Profissional: <span className="text-foreground font-medium">{BARBER_NAME}</span>
             </p>
           </div>
         </div>

@@ -247,11 +247,13 @@ export function ScheduleOverridesManager({ isOpen, onClose }: ScheduleOverridesM
   const getDateStatus = (date: Date) => {
     const override = getDateOverride(date);
     const dayOfWeek = date.getDay();
+    // Domingo (0) é sempre fechado por padrão
     const isDefaultOpen = DEFAULT_OPEN_DAYS.includes(dayOfWeek);
 
     if (override) {
       return override.is_open ? 'open-exception' : 'closed-exception';
     }
+    // Retornar 'default-closed' para domingos e outros dias não abertos
     return isDefaultOpen ? 'default-open' : 'default-closed';
   };
 
@@ -337,8 +339,8 @@ export function ScheduleOverridesManager({ isOpen, onClose }: ScheduleOverridesM
                           : status === 'closed-exception'
                           ? 'bg-red-500/20 text-red-400 border border-red-500/50'
                           : status === 'default-open'
-                          ? 'bg-card border border-border hover:border-primary/50'
-                          : 'bg-muted/50 text-muted-foreground border border-border'
+                          ? 'bg-card border border-border hover:border-primary/50 text-foreground'
+                          : 'bg-muted/50 text-muted-foreground border border-border cursor-not-allowed opacity-60'
                         }
                       `}
                     >

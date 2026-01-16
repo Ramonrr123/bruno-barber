@@ -38,7 +38,7 @@ BEGIN
     
     IF NOT EXISTS (SELECT 1 FROM public.services WHERE name = 'Combo Sapo') THEN
         INSERT INTO public.services (name, duration, price, description, icon) 
-        VALUES ('Combo Sapo', 70, 85.00, 'Cabelo + Barba completa - O pacote premium', '🐸');
+        VALUES ('Combo Sapo', 70, 85.00, 'Cabelo + Barba completa - O pacote premium', '💇');
     END IF;
 END $$;
 

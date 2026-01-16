@@ -8,6 +8,8 @@ import { Service } from '@/types/booking';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { BARBER_NAME } from '@/data/constants';
+import { getServiceIcon } from '@/lib/serviceIcons';
+import { formatDuration } from '@/lib/formatDuration';
 
 interface ClientInfoFormProps {
   service: Service;
@@ -200,13 +202,18 @@ export function ClientInfoForm({
       </button>
 
       {/* Summary Card */}
-      <div className="glass-card rounded-xl p-4 mb-6">
+      <div className="glass-card rounded-xl p-4 mb-6 border border-white/10">
         <div className="flex items-center gap-3 mb-3">
-          <span className="text-2xl">{service.icon}</span>
-          <div>
+          <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center border border-white/5 flex-shrink-0">
+            {(() => {
+              const IconComponent = getServiceIcon(service.icon);
+              return <IconComponent className="w-6 h-6 text-primary/80" />;
+            })()}
+          </div>
+          <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-foreground">{service.name}</h3>
             <p className="text-sm text-muted-foreground">
-              {service.duration} min • R$ {service.price}
+              {formatDuration(service.duration)} • <span className="text-primary font-semibold neon-text">R$ {service.price.toFixed(2).replace('.', ',')}</span>
             </p>
           </div>
         </div>

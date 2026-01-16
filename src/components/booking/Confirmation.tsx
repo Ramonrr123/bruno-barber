@@ -1,9 +1,10 @@
 import { motion } from 'framer-motion';
-import { Check, Calendar } from 'lucide-react';
+import { Check, Calendar, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { BookingData } from '@/types/booking';
 import { BARBER_NAME } from '@/data/constants';
+import { getServiceIcon } from '@/lib/serviceIcons';
 
 interface ConfirmationProps {
   bookingData: BookingData;
@@ -48,7 +49,7 @@ export function Confirmation({ bookingData, onNewBooking }: ConfirmationProps) {
         transition={{ delay: 0.3 }}
         className="text-2xl font-bold text-foreground mb-2 text-center"
       >
-        Agendado! 🎉
+        Agendado com sucesso!
       </motion.h1>
       
       <motion.p
@@ -65,23 +66,28 @@ export function Confirmation({ bookingData, onNewBooking }: ConfirmationProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
-        className="w-full glass-card rounded-xl p-5 mb-6"
+        className="w-full glass-card rounded-xl p-5 mb-6 border border-white/10"
       >
         <div className="flex items-center gap-3 mb-4">
-          <span className="text-3xl">{service.icon}</span>
-          <div>
+          <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center border border-white/5 flex-shrink-0">
+            {(() => {
+              const IconComponent = getServiceIcon(service.icon);
+              return <IconComponent className="w-6 h-6 text-primary/80" />;
+            })()}
+          </div>
+          <div className="flex-1 min-w-0">
             <h3 className="font-bold text-lg text-foreground">{service.name}</h3>
-            <p className="text-primary font-semibold">R$ {service.price}</p>
+            <p className="text-primary font-semibold neon-text">R$ {service.price.toFixed(2).replace('.', ',')}</p>
           </div>
         </div>
         
-        <div className="space-y-2 border-t border-border pt-4">
+        <div className="space-y-2 border-t border-white/10 pt-4">
           <div className="flex items-center gap-2 text-foreground">
-            <Calendar className="w-4 h-4 text-primary" />
+            <Calendar className="w-4 h-4 text-primary/80" />
             <span className="capitalize">{formattedDate}</span>
           </div>
           <div className="flex items-center gap-2 text-foreground">
-            <span className="text-primary text-lg">🕐</span>
+            <Clock className="w-4 h-4 text-primary/80" />
             <span className="font-semibold">{time} - {endTime} • Profissional: {BARBER_NAME}</span>
           </div>
         </div>

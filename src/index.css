@@ -108,10 +108,53 @@
   }
 
   .glass-card {
-    @apply bg-card/80 backdrop-blur-md border border-border/50;
+    @apply bg-card/90 backdrop-blur-xl border border-white/10;
   }
 
   .surface-elevated {
     background-color: hsl(var(--surface-elevated));
+  }
+
+  /* Scroll Area Customizada para Lista de Serviços */
+  .services-scroll-container {
+    max-height: min(500px, 60vh);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 0.5rem;
+    /* Scrollbar customizada - fina e discreta */
+    scrollbar-width: thin;
+    scrollbar-color: hsl(0 0% 30% / 0.5) transparent;
+    /* Suporte para touch no mobile */
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  /* Webkit Scrollbar (Chrome, Safari, Edge) */
+  .services-scroll-container::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .services-scroll-container::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 10px;
+    margin: 4px 0;
+  }
+
+  .services-scroll-container::-webkit-scrollbar-thumb {
+    background: hsl(0 0% 30% / 0.4);
+    border-radius: 10px;
+    transition: background 0.2s ease;
+  }
+
+  .services-scroll-container::-webkit-scrollbar-thumb:hover {
+    background: hsl(0 0% 40% / 0.6);
+  }
+
+  /* Firefox */
+  @-moz-document url-prefix() {
+    .services-scroll-container {
+      scrollbar-width: thin;
+      scrollbar-color: hsl(0 0% 30% / 0.4) transparent;
+    }
   }
 }

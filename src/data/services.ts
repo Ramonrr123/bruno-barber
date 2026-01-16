@@ -23,6 +23,6 @@ export const services: Service[] = [
     duration: 70,
     price: 85,
     description: 'Cabelo + Barba completa - O pacote premium',
-    icon: '🐸',
+    icon: '💇',
   },
 ];
