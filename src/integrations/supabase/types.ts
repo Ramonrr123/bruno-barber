@@ -83,6 +83,30 @@ export type Database = {
         }
         Relationships: []
       }
+      business_settings: {
+        Row: {
+          id: string
+          whatsapp_url: string | null
+          instagram_url: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          whatsapp_url?: string | null
+          instagram_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          whatsapp_url?: string | null
+          instagram_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

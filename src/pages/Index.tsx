@@ -1,5 +1,6 @@
 import { AnimatePresence } from 'framer-motion';
 import { Header } from '@/components/booking/Header';
+import { Footer } from '@/components/booking/Footer';
 import { StepIndicator } from '@/components/booking/StepIndicator';
 import { ServiceSelection } from '@/components/booking/ServiceSelection';
 import { DateTimeSelection } from '@/components/booking/DateTimeSelection';
@@ -21,12 +22,12 @@ const Index = () => {
   } = useBooking();
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <Header />
       
       {step < 4 && <StepIndicator currentStep={step} totalSteps={4} />}
 
-      <main className="max-w-lg mx-auto">
+      <main className="max-w-lg mx-auto flex-1 w-full">
         <AnimatePresence mode="wait">
           {step === 1 && (
             <ServiceSelection 
@@ -68,6 +69,8 @@ const Index = () => {
           )}
         </AnimatePresence>
       </main>
+
+      <Footer />
     </div>
   );
 };
