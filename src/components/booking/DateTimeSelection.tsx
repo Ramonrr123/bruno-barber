@@ -111,6 +111,33 @@ export function DateTimeSelection({
         }
 
         // ============================================
+        // PASSO D: Buscar bloqueios (exceptions) do dia
+        // ============================================
+        let exceptions: Array<{ is_all_day: boolean; start_time: string | null; end_time: string | null }> = [];
+        try {
+          const { data: exceptionsData, error: exceptionsError } = await supabase
+            .from('exceptions')
+            .select('is_all_day, start_time, end_time')
+            .eq('date', dateStr);
+
+          // Se não encontrar tabela ou não houver bloqueios, continuar normalmente
+          if (!exceptionsError && exceptionsData) {
+            exceptions = exceptionsData;
+            
+            // Se houver bloqueio de dia inteiro, retornar 0 slots
+            if (exceptionsData.some(ex => ex.is_all_day)) {
+              console.log('Dia inteiro bloqueado por exceção');
+              setSlots([]);
+              setIsLoading(false);
+              return;
+            }
+          }
+        } catch (error) {
+          // Se tabela não existir ainda, apenas continuar sem bloqueios
+          console.debug('Tabela exceptions não encontrada ou erro ao buscar bloqueios:', error);
+        }
+
+        // ============================================
         // Gerar slots baseado na disponibilidade
         // ============================================
         const availableSlots = generateAvailableSlots(
@@ -118,7 +145,8 @@ export function DateTimeSelection({
           availability.endTime!,
           service.duration,
           appointments || [],
-          selectedDate
+          selectedDate,
+          exceptions
         );
 
         setSlots(availableSlots);

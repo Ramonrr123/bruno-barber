@@ -43,3 +43,14 @@ export interface ScheduleOverride {
   created_at: string;
   updated_at: string;
 }
+
+export interface Exception {
+  id: string;
+  date: string; // YYYY-MM-DD
+  start_time: string | null; // HH:MM (null se is_all_day = true)
+  end_time: string | null; // HH:MM (null se is_all_day = true)
+  is_all_day: boolean;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}

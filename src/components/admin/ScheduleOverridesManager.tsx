@@ -8,6 +8,20 @@ import { ScheduleOverride } from '@/types/booking';
 import { toast } from 'sonner';
 import { DEFAULT_OPEN_DAYS } from '@/lib/availability';
 
+// Função auxiliar para normalizar data para meio-dia (evita problemas de timezone)
+// Garante que mesmo com timezone GMT-3, a data continue no dia correto
+const normalizeToNoon = (date: Date): Date => {
+  const normalized = new Date(date);
+  normalized.setHours(12, 0, 0, 0); // Força 12:00:00
+  return normalized;
+};
+
+// Função auxiliar para obter o dia da semana de forma segura (sem problemas de timezone)
+const getSafeDayOfWeek = (date: Date): number => {
+  const normalized = normalizeToNoon(date);
+  return normalized.getDay(); // Agora sempre retorna o dia correto
+};
+
 // Verificar se a tabela existe antes de fazer queries
 async function checkTableExists(supabase: any): Promise<boolean> {
   try {
@@ -112,7 +126,7 @@ export function ScheduleOverridesManager({ isOpen, onClose }: ScheduleOverridesM
   const handleDateClick = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     const existingOverride = overrides.find(o => o.date === dateStr);
-    const dayOfWeek = date.getDay();
+    const dayOfWeek = getSafeDayOfWeek(date); // Usar função segura para evitar problemas de timezone
     const isDefaultOpen = DEFAULT_OPEN_DAYS.includes(dayOfWeek);
 
     setSelectedDate(date);
@@ -246,7 +260,7 @@ export function ScheduleOverridesManager({ isOpen, onClose }: ScheduleOverridesM
 
   const getDateStatus = (date: Date) => {
     const override = getDateOverride(date);
-    const dayOfWeek = date.getDay();
+    const dayOfWeek = getSafeDayOfWeek(date); // Usar função segura para evitar problemas de timezone
     // Domingo (0) é sempre fechado por padrão
     const isDefaultOpen = DEFAULT_OPEN_DAYS.includes(dayOfWeek);
 
@@ -257,10 +271,11 @@ export function ScheduleOverridesManager({ isOpen, onClose }: ScheduleOverridesM
     return isDefaultOpen ? 'default-open' : 'default-closed';
   };
 
+  // Gerar dias do mês e normalizar para meio-dia (evita problemas de timezone)
   const monthDays = eachDayOfInterval({
     start: startOfMonth(selectedMonth),
     end: endOfMonth(selectedMonth),
-  });
+  }).map(normalizeToNoon); // Normalizar cada data para meio-dia antes de usar
 
   if (!isOpen) return null;
 
@@ -325,7 +340,9 @@ export function ScheduleOverridesManager({ isOpen, onClose }: ScheduleOverridesM
                 ))}
                 {monthDays.map((day) => {
                   const status = getDateStatus(day);
-                  const isToday = isSameDay(day, new Date());
+                  // Normalizar a data de hoje também para comparação correta
+                  const today = normalizeToNoon(new Date());
+                  const isToday = isSameDay(day, today);
                   
                   return (
                     <button

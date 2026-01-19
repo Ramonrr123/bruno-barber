@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { format, addDays, subDays, isToday, parseISO } from 'date-fns';
+import { format, addDays, subDays, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
   Clock, 
@@ -16,21 +16,14 @@ import {
   ChevronLeft,
   ChevronRight,
   UserX,
-  Bell,
-  Calendar
+  Ban,
+  Scissors
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { Appointment } from '@/types/booking';
-import { services } from '@/data/services';
+import { Appointment, Service } from '@/types/booking';
 import { toast } from 'sonner';
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerDescription,
-} from '@/components/ui/drawer';
-import { ScheduleOverridesManager } from '@/components/admin/ScheduleOverridesManager';
+import { BlockTimeManager } from '@/components/admin/BlockTimeManager';
+import { ServicesManager } from '@/components/admin/ServicesManager';
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -48,18 +41,9 @@ export default function Admin() {
     duration: 30,
   });
   const [conflictWarning, setConflictWarning] = useState<string | null>(null);
-  const [recentCancellations, setRecentCancellations] = useState<Appointment[]>([]);
-  
-  // Sistema de notificações
-  interface Notification {
-    id: string;
-    appointment: Appointment;
-    timestamp: Date;
-    read: boolean;
-  }
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [showNotificationsDrawer, setShowNotificationsDrawer] = useState(false);
-  const [showScheduleOverrides, setShowScheduleOverrides] = useState(false);
+  const [showBlockTimeManager, setShowBlockTimeManager] = useState(false);
+  const [showServicesManager, setShowServicesManager] = useState(false);
+  const [services, setServices] = useState<Service[]>([]);
 
   // Verificar autenticação
   useEffect(() => {
@@ -129,51 +113,37 @@ export default function Admin() {
     }
   };
 
-  // Verificar cancelamentos recentes (últimas 2 horas)
-  const checkRecentCancellations = async () => {
+  // Buscar serviços do banco
+  const fetchServices = async () => {
     try {
-      const twoHoursAgo = new Date();
-      twoHoursAgo.setHours(twoHoursAgo.getHours() - 2);
-      
       const { data, error } = await supabase
-        .from('appointments')
-        .select('*')
-        .eq('status', 'cancelled')
-        .gte('created_at', twoHoursAgo.toISOString())
-        .order('created_at', { ascending: false })
-        .limit(10);
+        .from('services')
+        .select('id, name, duration, price, description, icon')
+        .order('name', { ascending: true });
 
       if (error) throw error;
-
-      if (data && data.length > 0) {
-        setRecentCancellations(data as Appointment[]);
-        // Adicionar notificações para cancelamentos recentes
-        const newNotifications: Notification[] = (data as Appointment[]).map((apt) => ({
-          id: `${apt.id}-${apt.created_at}`,
-          appointment: apt,
-          timestamp: new Date(apt.created_at || new Date()),
-          read: false,
-        }));
-        
-        // Adicionar apenas notificações novas (não duplicadas)
-        setNotifications((prev) => {
-          const existingIds = new Set(prev.map(n => n.id));
-          const uniqueNew = newNotifications.filter(n => !existingIds.has(n.id));
-          return [...uniqueNew, ...prev].slice(0, 20); // Limitar a 20 notificações
-        });
-      }
+      
+      const formattedServices: Service[] = (data || []).map((service) => ({
+        id: service.id,
+        name: service.name,
+        duration: service.duration,
+        price: typeof service.price === 'number' ? service.price : parseFloat(String(service.price)),
+        description: service.description || '',
+        icon: service.icon || 'scissors',
+      }));
+      
+      setServices(formattedServices);
     } catch (error) {
-      console.error('Error checking cancellations:', error);
+      console.error('Error fetching services:', error);
+      // Fallback: manter array vazio se houver erro
+      setServices([]);
     }
   };
 
   useEffect(() => {
     if (!checkingAuth) {
       fetchAppointments();
-      // Verificar cancelamentos apenas quando carregar a página ou mudar de data
-      if (isToday(selectedDate)) {
-        checkRecentCancellations();
-      }
+      fetchServices();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkingAuth, selectedDate]);
@@ -198,31 +168,6 @@ export default function Admin() {
           console.log('Mudança detectada na tabela appointments:', payload);
           // Recarregar agendamentos quando houver qualquer mudança
           fetchAppointments();
-          
-          // Se for um cancelamento, adicionar notificação
-          if (payload.eventType === 'UPDATE' && payload.new.status === 'cancelled') {
-            const apt = payload.new as Appointment;
-            const appointmentTime = new Date(`${apt.appointment_date}T${apt.start_time}`);
-            const now = new Date();
-            
-            // Só notificar se o cancelamento foi antes do horário
-            if (now < appointmentTime) {
-              const notificationId = `${apt.id}-${Date.now()}`;
-              const newNotification: Notification = {
-                id: notificationId,
-                appointment: apt,
-                timestamp: new Date(),
-                read: false,
-              };
-              
-              setNotifications((prev) => {
-                // Evitar duplicatas
-                const exists = prev.some(n => n.appointment.id === apt.id && !n.read);
-                if (exists) return prev;
-                return [newNotification, ...prev].slice(0, 20);
-              });
-            }
-          }
         }
       )
       .subscribe();
@@ -312,6 +257,21 @@ export default function Admin() {
     const appointmentTime = new Date(`${apt.appointment_date}T${apt.start_time}`);
     
     return now > appointmentTime;
+  };
+
+  // Verificar se agendamento já foi concluído automaticamente (passou do horário de término)
+  const isAppointmentAutoCompleted = (apt: Appointment): boolean => {
+    // Apenas verificar para agendamentos com status 'scheduled' ou 'confirmed'
+    if (apt.status !== 'scheduled' && apt.status !== 'confirmed') {
+      return false;
+    }
+    
+    // Criar data/hora do término do agendamento
+    const appointmentEndDateTime = new Date(`${apt.appointment_date}T${apt.end_time}`);
+    const now = new Date();
+    
+    // Se o horário de término já passou, considerar auto-concluído
+    return now > appointmentEndDateTime;
   };
 
   // Verificar conflitos de horário
@@ -423,50 +383,6 @@ export default function Admin() {
     }
   };
 
-  // Limpar notificações antigas periodicamente (DEVE estar antes de qualquer return)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setNotifications((prev) => {
-        const now = new Date();
-        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        // Remover notificações lidas e muito antigas
-        return prev.filter(n => {
-          if (n.read) return false; // Remover lidas
-          if (n.timestamp < oneDayAgo) return false; // Remover muito antigas
-          return true;
-        });
-      });
-    }, 60000); // Verificar a cada minuto
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const unreadCount = notifications.filter(n => !n.read).length;
-  
-  const handleOpenNotifications = () => {
-    setShowNotificationsDrawer(true);
-    // Marcar apenas as não lidas como lidas quando abrir
-    setNotifications((prev) => 
-      prev.map(n => n.read ? n : { ...n, read: true })
-    );
-  };
-
-  // Remover notificações lidas quando o drawer for fechado
-  const handleCloseNotifications = (open: boolean) => {
-    setShowNotificationsDrawer(open);
-    // Quando fechar, remover todas as notificações que foram lidas
-    if (!open) {
-      setNotifications((prev) => {
-        // Remover notificações lidas e também muito antigas (mais de 24 horas)
-        const now = new Date();
-        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        return prev.filter(n => {
-          // Manter apenas não lidas e recentes (menos de 24 horas)
-          return !n.read && n.timestamp > oneDayAgo;
-        });
-      });
-    }
-  };
 
   if (checkingAuth) {
     return (
@@ -485,32 +401,26 @@ export default function Admin() {
             <span className="text-2xl">🐸</span>
             <h1 className="text-xl font-bold text-foreground">Agenda</h1>
           </div>
-          <div className="flex items-center gap-2">
-            {/* Botão de Exceções de Agenda */}
+          <div className="flex items-center gap-3">
+            {/* Botão de Serviços */}
             <button
-              onClick={() => setShowScheduleOverrides(true)}
-              className="p-2 rounded-lg hover:bg-muted transition-colors"
-              aria-label="Exceções de Agenda"
-              title="Gerenciar exceções de agenda"
+              onClick={() => setShowServicesManager(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary border border-primary/20 rounded-lg hover:bg-primary/20 transition-all font-medium"
+              aria-label="Gerenciar Serviços"
+              title="Gerenciar serviços oferecidos"
             >
-              <Calendar className="w-5 h-5 text-foreground" />
+              <Scissors className="w-5 h-5" />
+              <span className="hidden sm:inline">Serviços</span>
             </button>
-            {/* Ícone de Notificações */}
+            {/* Botão de Bloqueios de Horário - Destaque */}
             <button
-              onClick={handleOpenNotifications}
-              className="relative p-2 rounded-lg hover:bg-muted transition-colors"
-              aria-label="Notificações"
+              onClick={() => setShowBlockTimeManager(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all font-medium shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30"
+              aria-label="Bloqueios de Horário"
+              title="Bloquear horários ou dias inteiros"
             >
-              <Bell className="w-5 h-5 text-foreground" />
-              {unreadCount > 0 && (
-                <motion.span
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-bold"
-                >
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </motion.span>
-              )}
+              <Ban className="w-5 h-5" />
+              <span className="hidden sm:inline">Bloquear Horário</span>
             </button>
             <button
               onClick={handleLogout}
@@ -633,29 +543,72 @@ export default function Admin() {
                   </div>
 
                   {(apt.status === 'scheduled' || apt.status === 'confirmed') && (
-                    <div className="flex gap-2 pt-3 border-t border-border">
-                      <button
-                        onClick={() => handleComplete(apt.id)}
-                        className="flex-1 bg-emerald-500/20 text-emerald-400 py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-emerald-500/30 transition-colors font-medium"
-                      >
-                        <Check className="w-4 h-4" />
-                        Concluir
-                      </button>
-                      <button
-                        onClick={() => handleNoShow(apt.id)}
-                        className="bg-gray-500/10 text-gray-400 py-2 px-4 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-500/20 transition-colors font-medium text-sm"
-                        title="Marcar como não compareceu"
-                      >
-                        <UserX className="w-4 h-4" />
-                        Não Veio
-                      </button>
-                      <button
-                        onClick={() => handleCancel(apt.id)}
-                        className="flex-1 bg-destructive/20 text-destructive py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-destructive/30 transition-colors font-medium"
-                      >
-                        <X className="w-4 h-4" />
-                        Cancelar
-                      </button>
+                    <div className="pt-3 border-t border-border">
+                      {(() => {
+                        const isAutoCompleted = isAppointmentAutoCompleted(apt);
+                        
+                        if (isAutoCompleted) {
+                          // Agendamento passado - Auto-concluído visualmente
+                          return (
+                            <div className="space-y-2">
+                              {/* Badge de Auto-Conclusão */}
+                              <div className="flex items-center justify-center gap-2 py-2">
+                                <span className="px-3 py-1.5 text-sm rounded-full border border-emerald-500/50 bg-emerald-500/20 text-emerald-400 font-medium flex items-center gap-2">
+                                  <Check className="w-4 h-4" />
+                                  Concluído (Auto)
+                                </span>
+                              </div>
+                              
+                              {/* Botões de correção - mantém "Não Veio" e "Cancelar" */}
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleNoShow(apt.id)}
+                                  className="flex-1 bg-gray-500/10 text-gray-400 py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-500/20 transition-colors font-medium text-sm"
+                                  title="Marcar como não compareceu (correção)"
+                                >
+                                  <UserX className="w-4 h-4" />
+                                  Não Veio
+                                </button>
+                                <button
+                                  onClick={() => handleCancel(apt.id)}
+                                  className="flex-1 bg-destructive/20 text-destructive py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-destructive/30 transition-colors font-medium text-sm"
+                                >
+                                  <X className="w-4 h-4" />
+                                  Cancelar
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        } else {
+                          // Agendamento futuro - Botões normais
+                          return (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleComplete(apt.id)}
+                                className="flex-1 bg-emerald-500/20 text-emerald-400 py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-emerald-500/30 transition-colors font-medium"
+                              >
+                                <Check className="w-4 h-4" />
+                                Concluir
+                              </button>
+                              <button
+                                onClick={() => handleNoShow(apt.id)}
+                                className="bg-gray-500/10 text-gray-400 py-2 px-4 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-500/20 transition-colors font-medium text-sm"
+                                title="Marcar como não compareceu"
+                              >
+                                <UserX className="w-4 h-4" />
+                                Não Veio
+                              </button>
+                              <button
+                                onClick={() => handleCancel(apt.id)}
+                                className="flex-1 bg-destructive/20 text-destructive py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-destructive/30 transition-colors font-medium"
+                              >
+                                <X className="w-4 h-4" />
+                                Cancelar
+                              </button>
+                            </div>
+                          );
+                        }
+                      })()}
                     </div>
                   )}
                 </motion.div>
@@ -813,92 +766,16 @@ export default function Admin() {
           )}
         </AnimatePresence>
 
-        {/* Drawer de Notificações */}
-        <Drawer open={showNotificationsDrawer} onOpenChange={handleCloseNotifications}>
-          <DrawerContent className="max-h-[80vh]">
-            <DrawerHeader className="text-left">
-              <DrawerTitle className="text-xl font-bold">Notificações</DrawerTitle>
-              <DrawerDescription>
-                Cancelamentos e atualizações recentes
-              </DrawerDescription>
-            </DrawerHeader>
-            <div className="overflow-y-auto px-4 pb-4">
-              {notifications.length === 0 ? (
-                <div className="text-center py-12">
-                  <Bell className="w-12 h-12 mx-auto text-muted-foreground mb-4 opacity-50" />
-                  <p className="text-muted-foreground">Nenhuma notificação</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {notifications.map((notification) => {
-                    const apt = notification.appointment;
-                    const dateFormatted = format(parseISO(apt.appointment_date), "d 'de' MMMM", { locale: ptBR });
-                    const timeFormatted = apt.start_time.slice(0, 5);
-                    const appointmentTime = new Date(`${apt.appointment_date}T${apt.start_time}`);
-                    const now = new Date();
-                    const wasBeforeTime = now < appointmentTime;
-                    
-                    return (
-                      <motion.div
-                        key={notification.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className={`glass-card rounded-xl p-4 border ${
-                          !notification.read 
-                            ? 'border-primary/50 bg-primary/5' 
-                            : 'border-border'
-                        }`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className={`p-2 rounded-lg ${
-                            !notification.read 
-                              ? 'bg-primary/20 text-primary' 
-                              : 'bg-muted text-muted-foreground'
-                          }`}>
-                            <AlertTriangle className="w-5 h-5" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-semibold text-foreground mb-1">
-                              Cancelamento
-                            </p>
-                            <p className="text-sm text-muted-foreground mb-2">
-                              <span className="font-medium">{apt.client_name}</span> cancelou{' '}
-                              <span className="font-medium">{apt.service_type}</span>
-                            </p>
-                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                              <span>{dateFormatted} às {timeFormatted}</span>
-                              {wasBeforeTime && (
-                                <span className="text-primary font-medium">Horário liberado</span>
-                              )}
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-2">
-                              {format(notification.timestamp, "HH:mm 'de' dd/MM/yyyy", { locale: ptBR })}
-                            </p>
-                          </div>
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-            {notifications.length > 0 && (
-              <div className="border-t p-4">
-                <button
-                  onClick={() => setNotifications([])}
-                  className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Limpar todas as notificações
-                </button>
-              </div>
-            )}
-          </DrawerContent>
-        </Drawer>
+        {/* Gerenciador de Bloqueios de Horário */}
+        <BlockTimeManager
+          isOpen={showBlockTimeManager}
+          onClose={() => setShowBlockTimeManager(false)}
+        />
 
-        {/* Gerenciador de Exceções de Agenda */}
-        <ScheduleOverridesManager
-          isOpen={showScheduleOverrides}
-          onClose={() => setShowScheduleOverrides(false)}
+        {/* Gerenciador de Serviços */}
+        <ServicesManager
+          isOpen={showServicesManager}
+          onClose={() => setShowServicesManager(false)}
         />
       </div>
     </div>
