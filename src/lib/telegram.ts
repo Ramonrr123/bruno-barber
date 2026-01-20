@@ -30,26 +30,34 @@ export async function sendTelegramNotification({
 
   // 2. Mensagem Automática para o WhatsApp (URL Encoded)
   const whatsappMessage = encodeURIComponent(
-    `Fala ${clientName}! 🐸 Passando pra confirmar teu corte (${serviceName}) agendado para ${date}!`
+    `Fala ${clientName}, tranquilo? Passando pra confirmar teu corte (${serviceName}) agendado para ${date}!`
   );
   
   const whatsappLink = `https://wa.me/${cleanPhone}?text=${whatsappMessage}`;
 
   // 3. Montagem da Mensagem do Telegram
+  // Usando HTML parse mode para evitar problemas com links longos
+  const escapeHtml = (text: string) => {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  };
+
   let messageText = '';
 
   if (type === 'NEW_APPOINTMENT') {
-    messageText = `💰 *NOVO AGENDAMENTO!*\n\n` +
-      `👤 *Cliente:* ${clientName}\n` +
-      `✂️ *Serviço:* ${serviceName}\n` +
-      `📅 *Data:* ${date}\n\n` +
-      `👉 [CLIQUE AQUI PARA CONFIRMAR NO ZAP](${whatsappLink})`;
+    messageText = `💰 <b>NOVO AGENDAMENTO!</b>\n\n` +
+      `👤 <b>Cliente:</b> ${escapeHtml(clientName)}\n` +
+      `✂️ <b>Serviço:</b> ${escapeHtml(serviceName)}\n` +
+      `📅 <b>Data:</b> ${escapeHtml(date)}\n\n` +
+      `👉 <a href="${whatsappLink}">CLIQUE AQUI PARA CONFIRMAR NO ZAP</a>`;
   } else {
-    messageText = `⚠️ *AGENDAMENTO CANCELADO*\n\n` +
-      `👤 *Cliente:* ${clientName}\n` +
-      `📅 *Data Original:* ${date}\n` +
-      `❌ *O horário está livre novamente.*\n\n` +
-      `[Mandar Zap perguntando o motivo](${whatsappLink})`;
+    messageText = `⚠️ <b>AGENDAMENTO CANCELADO</b>\n\n` +
+      `👤 <b>Cliente:</b> ${escapeHtml(clientName)}\n` +
+      `📅 <b>Data Original:</b> ${escapeHtml(date)}\n` +
+      `❌ <b>O horário está livre novamente.</b>\n\n` +
+      `<a href="${whatsappLink}">Mandar Zap perguntando o motivo</a>`;
   }
 
   // 4. Envio Silencioso (Fire and Forget)
@@ -60,7 +68,7 @@ export async function sendTelegramNotification({
       body: JSON.stringify({
         chat_id: TELEGRAM_CHAT_ID,
         text: messageText,
-        parse_mode: 'Markdown', // Importante para o link funcionar
+        parse_mode: 'HTML', // HTML é mais robusto para links longos
         disable_web_page_preview: true // Deixa a mensagem mais limpa
       }),
     });

@@ -75,11 +75,12 @@ export async function GET() {
     const whatsappLink = `https://wa.me/${cleanPhone}?text=${whatsappMessage}`;
 
     // Montar mensagem de teste com link do WhatsApp
-    const testMessage = `🔔 *Teste de Diagnóstico do Sistema*\n\n` +
+    // Usando HTML parse mode para evitar problemas com links longos
+    const testMessage = `🔔 <b>Teste de Diagnóstico do Sistema</b>\n\n` +
       `Este é um teste automatizado para verificar a conexão com o Telegram.\n\n` +
       `✅ Token configurado: ${TELEGRAM_TOKEN ? 'Sim' : 'Não'}\n` +
       `✅ Chat ID configurado: ${TELEGRAM_CHAT_ID ? 'Sim' : 'Não'}\n\n` +
-      `📱 [Testar Link do WhatsApp](${whatsappLink})`;
+      `📱 <a href="${whatsappLink}">Testar Link do WhatsApp</a>`;
 
     // 4. Teste de Envio Real
     const telegramApiUrl = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
@@ -94,7 +95,7 @@ export async function GET() {
       body: JSON.stringify({
         chat_id: TELEGRAM_CHAT_ID,
         text: testMessage,
-        parse_mode: 'Markdown', // Para suportar o link Markdown
+        parse_mode: 'HTML', // HTML é mais robusto para links longos
         disable_web_page_preview: true,
       }),
     });
