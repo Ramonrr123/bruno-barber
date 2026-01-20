@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { notification } from '@/hooks/useNotification';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -55,7 +55,7 @@ export default function Login() {
           url: !!supabaseUrl,
           key: !!supabaseKey
         });
-        toast.error('Erro de configuração: Verifique as variáveis de ambiente do Supabase');
+        notification.error('Erro de configuração: Verifique as variáveis de ambiente do Supabase');
         return;
       }
 
@@ -81,10 +81,10 @@ export default function Login() {
       console.log('Login bem-sucedido:', { session: !!data.session });
 
       if (data.session) {
-        toast.success('Login realizado com sucesso!');
+        notification.success('Login realizado com sucesso!');
         navigate('/admin', { replace: true });
       } else {
-        toast.error('Sessão não criada. Tente novamente.');
+        notification.error('Sessão não criada. Tente novamente.');
       }
     } catch (error: any) {
       console.error('Login error completo:', error);
@@ -102,7 +102,7 @@ export default function Login() {
         errorMessage = error.message;
       }
       
-      toast.error(errorMessage);
+      notification.error(errorMessage);
     } finally {
       setIsLoading(false);
     }

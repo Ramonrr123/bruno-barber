@@ -6,7 +6,8 @@ import { Appointment } from '@/types/booking';
 import { format, parseISO, isAfter, startOfToday } from 'date-fns';
 import { BARBER_NAME } from '@/data/constants';
 import { ptBR } from 'date-fns/locale';
-import { toast } from 'sonner';
+import { notification } from '@/hooks/useNotification';
+import { showConfirm as confirm } from '@/hooks/useConfirm';
 import { sendTelegramNotification } from '@/lib/telegram';
 
 interface CheckAppointmentsModalProps {
@@ -29,7 +30,7 @@ export function CheckAppointmentsModal({ isOpen, onClose }: CheckAppointmentsMod
     e.preventDefault();
     
     if (!phone.trim()) {
-      toast.error('Digite seu número de WhatsApp');
+      notification.error('Digite seu número de WhatsApp');
       return;
     }
 
@@ -41,7 +42,7 @@ export function CheckAppointmentsModal({ isOpen, onClose }: CheckAppointmentsMod
       const cleanPhone = sanitizePhone(phone);
       
       if (cleanPhone.length < 10) {
-        toast.error('Número de telefone inválido');
+        notification.error('Número de telefone inválido');
         setIsLoading(false);
         return;
       }
@@ -64,11 +65,11 @@ export function CheckAppointmentsModal({ isOpen, onClose }: CheckAppointmentsMod
       setHasSearched(true);
 
       if (!data || data.length === 0) {
-        toast.info('Nenhum agendamento futuro encontrado');
+        notification.info('Nenhum agendamento futuro encontrado');
       }
     } catch (error) {
       console.error('Error searching appointments:', error);
-      toast.error('Erro ao buscar agendamentos. Tente novamente.');
+      notification.error('Erro ao buscar agendamentos. Tente novamente.');
     } finally {
       setIsLoading(false);
     }
@@ -82,7 +83,8 @@ export function CheckAppointmentsModal({ isOpen, onClose }: CheckAppointmentsMod
   };
 
   const handleCancelAppointment = async (appointmentId: string, appointmentDate: string, appointmentTime: string) => {
-    if (!confirm('Tem certeza que deseja cancelar este agendamento? O horário ficará disponível para outros clientes.')) return;
+    const confirmed = await confirm('Tem certeza que deseja cancelar este agendamento? O horário ficará disponível para outros clientes.');
+    if (!confirmed) return;
 
     try {
       // Verificar se o horário já passou
@@ -91,7 +93,7 @@ export function CheckAppointmentsModal({ isOpen, onClose }: CheckAppointmentsMod
       const isBeforeAppointment = now < appointmentDateTime;
 
       if (!isBeforeAppointment) {
-        toast.error('Não é possível cancelar um agendamento que já passou.');
+        notification.error('Não é possível cancelar um agendamento que já passou.');
         return;
       }
 
@@ -130,7 +132,7 @@ export function CheckAppointmentsModal({ isOpen, onClose }: CheckAppointmentsMod
         });
       }
 
-      toast.success('Agendamento cancelado! O horário está disponível novamente.');
+      notification.success('Agendamento cancelado! O horário está disponível novamente.');
       
       // Recarregar a lista
       const cleanPhone = sanitizePhone(phone);
@@ -150,11 +152,11 @@ export function CheckAppointmentsModal({ isOpen, onClose }: CheckAppointmentsMod
       }
 
       // O horário agora está disponível automaticamente (não aparece mais nas buscas de disponibilidade)
-      console.log(`✅ Horário liberado: ${appointmentDate} às ${appointmentTime} está disponível novamente`);
+      // Horário liberado com sucesso
       
     } catch (error) {
       console.error('Error cancelling appointment:', error);
-      toast.error('Erro ao cancelar agendamento. Tente novamente.');
+      notification.error('Erro ao cancelar agendamento. Tente novamente.');
     }
   };
 

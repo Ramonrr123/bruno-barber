@@ -26,7 +26,6 @@ export function ServiceSelection({ onSelect }: ServiceSelectionProps) {
           .order('name', { ascending: true });
 
         if (fetchError) {
-          console.error('Erro ao buscar serviços:', fetchError);
           setError('Erro ao carregar serviços. Tente novamente.');
           return;
         }
@@ -43,7 +42,6 @@ export function ServiceSelection({ onSelect }: ServiceSelectionProps) {
 
         setServices(formattedServices);
       } catch (err) {
-        console.error('Erro inesperado ao buscar serviços:', err);
         setError('Erro inesperado ao carregar serviços.');
       } finally {
         setIsLoading(false);

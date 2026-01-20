@@ -5,7 +5,8 @@ import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameDa
 import { ptBR } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { ScheduleOverride } from '@/types/booking';
-import { toast } from 'sonner';
+import { notification } from '@/hooks/useNotification';
+import { showConfirm as confirm } from '@/hooks/useConfirm';
 import { DEFAULT_OPEN_DAYS } from '@/lib/availability';
 
 // Função auxiliar para normalizar data para meio-dia (evita problemas de timezone)
@@ -111,7 +112,7 @@ export function ScheduleOverridesManager({ isOpen, onClose }: ScheduleOverridesM
         
         if (!isTableNotFound) {
           console.error('Erro ao buscar exceções:', error);
-          toast.error('Erro ao carregar exceções');
+          notification.error('Erro ao carregar exceções');
         }
         // Sempre retornar vazio em caso de erro
         setOverrides([]);
@@ -161,12 +162,12 @@ export function ScheduleOverridesManager({ isOpen, onClose }: ScheduleOverridesM
       // Verificar se a tabela existe
       const tableExists = await checkTableExists(supabase);
       if (!tableExists) {
-        toast.error('Tabela schedule_overrides não existe. Execute a migration primeiro.');
+        notification.error('Tabela schedule_overrides não existe. Execute a migration primeiro.');
         return;
       }
 
       if (overrideForm.is_open && (!overrideForm.start_time || !overrideForm.end_time)) {
-        toast.error('Horários são obrigatórios quando o dia está aberto');
+        notification.error('Horários são obrigatórios quando o dia está aberto');
         return;
       }
 
@@ -195,7 +196,7 @@ export function ScheduleOverridesManager({ isOpen, onClose }: ScheduleOverridesM
           .eq('id', existing.id);
 
         if (error) throw error;
-        toast.success('Exceção atualizada com sucesso');
+        notification.success('Exceção atualizada com sucesso');
       } else {
         // Criar
         const { error } = await supabase
@@ -203,7 +204,7 @@ export function ScheduleOverridesManager({ isOpen, onClose }: ScheduleOverridesM
           .insert(overrideData);
 
         if (error) throw error;
-        toast.success('Exceção criada com sucesso');
+        notification.success('Exceção criada com sucesso');
       }
 
       // Recarregar exceções
@@ -220,12 +221,13 @@ export function ScheduleOverridesManager({ isOpen, onClose }: ScheduleOverridesM
       setShowOverrideModal(false);
     } catch (error: any) {
       console.error('Erro ao salvar exceção:', error);
-      toast.error(error.message || 'Erro ao salvar exceção');
+      notification.error(error.message || 'Erro ao salvar exceção');
     }
   };
 
   const handleDeleteOverride = async (id: string) => {
-    if (!confirm('Tem certeza que deseja remover esta exceção?')) return;
+    const confirmed = await confirm('Tem certeza que deseja remover esta exceção?');
+    if (!confirmed) return;
 
     try {
       const { error } = await supabase
@@ -234,7 +236,7 @@ export function ScheduleOverridesManager({ isOpen, onClose }: ScheduleOverridesM
         .eq('id', id);
 
       if (error) throw error;
-      toast.success('Exceção removida');
+      notification.success('Exceção removida');
       
       // Recarregar
       const start = startOfMonth(selectedMonth);
@@ -249,7 +251,7 @@ export function ScheduleOverridesManager({ isOpen, onClose }: ScheduleOverridesM
       setOverrides(data as ScheduleOverride[] || []);
     } catch (error: any) {
       console.error('Erro ao deletar exceção:', error);
-      toast.error('Erro ao remover exceção');
+      notification.error('Erro ao remover exceção');
     }
   };
 

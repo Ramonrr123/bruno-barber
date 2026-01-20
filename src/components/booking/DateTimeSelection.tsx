@@ -71,18 +71,10 @@ export function DateTimeSelection({
         // ============================================
         const availability = await checkDateAvailability(selectedDate, supabase);
         
-        console.log('Disponibilidade verificada:', {
-          date: format(selectedDate, 'yyyy-MM-dd'),
-          dayOfWeek: selectedDate.getDay(),
-          isAvailable: availability.isAvailable,
-          reason: availability.reason,
-          startTime: availability.startTime,
-          endTime: availability.endTime,
-        });
+        // Disponibilidade verificada
         
         if (!availability.isAvailable) {
           // Dia não disponível - retornar vazio
-          console.log('Dia não disponível:', availability.reason);
           setSlots([]);
           setIsLoading(false);
           return;
@@ -126,7 +118,7 @@ export function DateTimeSelection({
             
             // Se houver bloqueio de dia inteiro, retornar 0 slots
             if (exceptionsData.some(ex => ex.is_all_day)) {
-              console.log('Dia inteiro bloqueado por exceção');
+              // Dia inteiro bloqueado por exceção
               setSlots([]);
               setIsLoading(false);
               return;

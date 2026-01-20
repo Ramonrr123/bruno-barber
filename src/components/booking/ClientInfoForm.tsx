@@ -1,16 +1,24 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, User, Phone, Loader2 } from 'lucide-react';
-import InputMask from 'react-input-mask';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Service } from '@/types/booking';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { notification } from '@/hooks/useNotification';
 import { BARBER_NAME } from '@/data/constants';
 import { getServiceIcon } from '@/lib/serviceIcons';
 import { formatDuration } from '@/lib/formatDuration';
 import { sendTelegramNotification } from '@/lib/telegram';
+
+// Função para formatar telefone brasileiro
+const formatPhone = (value: string): string => {
+  const digits = value.replace(/\D/g, '');
+  if (digits.length <= 10) {
+    return digits.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3').replace(/-$/, '');
+  }
+  return digits.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3').replace(/-$/, '');
+};
 
 interface ClientInfoFormProps {
   service: Service;
@@ -74,7 +82,6 @@ export function ClientInfoForm({
       const dateStr = format(date, 'yyyy-MM-dd');
       
       // Double-check availability before inserting
-      console.log('Verificando conflitos para:', { dateStr, time, endTime });
       const { data: existingAppointments, error: checkError } = await supabase
         .from('appointments')
         .select('start_time, end_time')
@@ -86,7 +93,7 @@ export function ClientInfoForm({
         throw checkError;
       }
       
-      console.log('Agendamentos existentes encontrados:', existingAppointments);
+      // Agendamentos existentes verificados
       
       // Verificar conflitos manualmente
       const hasConflict = existingAppointments?.some((apt) => {
@@ -121,7 +128,7 @@ export function ClientInfoForm({
 
       // Validar dados antes de enviar
       if (!appointmentData.client_name || !appointmentData.client_phone || !appointmentData.service_type) {
-        toast.error('Preencha todos os campos obrigatórios');
+        notification.error('Preencha todos os campos obrigatórios');
         return;
       }
 
@@ -174,7 +181,7 @@ export function ClientInfoForm({
         throw insertError;
       }
 
-      console.log('Agendamento salvo com sucesso!', insertedData);
+      // Agendamento salvo com sucesso
 
       // Enviar notificação do Telegram (fire-and-forget, não bloqueia a resposta)
       const formattedDate = format(date, 'dd/MM', { locale: ptBR });
@@ -192,11 +199,11 @@ export function ClientInfoForm({
       });
 
       onUpdateClientInfo(name.trim(), phone);
-      toast.success('Agendamento confirmado e salvo no banco!');
+      notification.success('Agendamento confirmado e salvo no banco!');
       onConfirm();
     } catch (error) {
       console.error('Error creating appointment:', error);
-      toast.error('Erro ao agendar. Tente novamente.');
+      notification.error('Erro ao agendar. Tente novamente.');
     } finally {
       setIsSubmitting(false);
     }
@@ -276,22 +283,19 @@ export function ClientInfoForm({
           </label>
           <div className="relative">
             <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-            <InputMask
-              mask="(99) 99999-9999"
+            <input
+              type="tel"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-            >
-              {(inputProps: React.InputHTMLAttributes<HTMLInputElement>) => (
-                <input
-                  {...inputProps}
-                  type="tel"
-                  placeholder="(11) 99999-9999"
-                  className={`w-full bg-card border rounded-xl py-3 pl-11 pr-4 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-all ${
-                    errors.phone ? 'border-destructive' : 'border-border'
-                  }`}
-                />
-              )}
-            </InputMask>
+              onChange={(e) => {
+                const formatted = formatPhone(e.target.value);
+                setPhone(formatted);
+              }}
+              placeholder="(11) 99999-9999"
+              maxLength={15}
+              className={`w-full bg-card border rounded-xl py-3 pl-11 pr-4 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-all ${
+                errors.phone ? 'border-destructive' : 'border-border'
+              }`}
+            />
           </div>
           {errors.phone && (
             <p className="text-destructive text-sm mt-1">{errors.phone}</p>

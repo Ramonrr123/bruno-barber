@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, Trash2, Clock, DollarSign, Scissors } from 'lucide-react';
+import { X, Plus, Trash2, Clock, DollarSign, Scissors, Edit } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Service } from '@/types/booking';
-import { toast } from 'sonner';
+import { notification } from '@/hooks/useNotification';
+import { showConfirm as confirm } from '@/hooks/useConfirm';
 
 interface ServicesManagerProps {
   isOpen: boolean;
@@ -15,17 +16,20 @@ interface ServiceFormData {
   price: number;
   durationMinutes: number;
   durationHours: number;
+  description: string;
 }
 
 export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
   const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
   const [serviceForm, setServiceForm] = useState<ServiceFormData>({
     name: '',
     price: 0,
     durationMinutes: 30,
     durationHours: 0,
+    description: '',
   });
 
   // Buscar serviços
@@ -35,19 +39,20 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        toast.error('Usuário não autenticado');
+        notification.error('Usuário não autenticado');
         setIsLoading(false);
         return;
       }
 
-      // Tentar buscar com filtro user_id primeiro
+      // Buscar TODOS os serviços (públicos) independente de user_id
+      // Se no futuro quiser filtrar por user_id, descomente a linha .eq('user_id', user.id)
       let { data, error } = await supabase
         .from('services')
         .select('*')
-        .eq('user_id', user.id)
+        // .eq('user_id', user.id) // Comentado para buscar todos os serviços públicos
         .order('name', { ascending: true });
 
-      // Se der erro por user_id não existir, buscar todos os serviços
+      // Se der erro, tentar buscar sem filtro
       if (error) {
         const isUserIdError = 
           error.message?.includes('user_id') || 
@@ -82,7 +87,7 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
       setServices(formattedServices);
     } catch (error: any) {
       console.error('Erro ao buscar serviços:', error);
-      toast.error('Erro ao carregar serviços');
+      notification.error('Erro ao carregar serviços');
       setServices([]);
     } finally {
       setIsLoading(false);
@@ -95,15 +100,32 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
     }
   }, [isOpen]);
 
+  const handleEditService = (service: Service) => {
+    // Converter duração de minutos para horas e minutos
+    const hours = Math.floor(service.duration / 60);
+    const minutes = service.duration % 60;
+    
+    setServiceForm({
+      name: service.name,
+      price: service.price,
+      durationHours: hours,
+      durationMinutes: minutes,
+      description: service.description || '',
+    });
+    
+    setEditingServiceId(service.id);
+    setShowAddModal(true);
+  };
+
   const handleSaveService = async () => {
     // Validação
     if (!serviceForm.name.trim()) {
-      toast.error('Nome do serviço é obrigatório');
+      notification.error('Nome do serviço é obrigatório');
       return;
     }
 
     if (!serviceForm.price || serviceForm.price <= 0) {
-      toast.error('Preço deve ser maior que zero');
+      notification.error('Preço deve ser maior que zero');
       return;
     }
 
@@ -111,7 +133,7 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
     const totalMinutes = serviceForm.durationHours * 60 + serviceForm.durationMinutes;
     
     if (totalMinutes <= 0) {
-      toast.error('Duração deve ser maior que zero');
+      notification.error('Duração deve ser maior que zero');
       return;
     }
 
@@ -119,7 +141,7 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        toast.error('Usuário não autenticado');
+        notification.error('Usuário não autenticado');
         return;
       }
 
@@ -131,82 +153,112 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
         title: serviceName, // Sempre preencher title (coluna pode existir)
         price: serviceForm.price,
         duration: totalMinutes,
+        // NÃO adicionar user_id para que os serviços sejam públicos
+        // user_id será NULL por padrão, permitindo que todos vejam
       };
 
-      // Tentar adicionar user_id se a coluna existir
-      try {
-        serviceData.user_id = user.id;
-      } catch {
-        // Ignorar se user_id não puder ser definido
-      }
+      // Adicionar descrição (pode ser vazia)
+      serviceData.description = serviceForm.description.trim() || null;
 
-      // Tentar inserir primeiro
-      let { error } = await supabase
-        .from('services')
-        .insert(serviceData);
+      // Se estiver editando, fazer UPDATE
+      if (editingServiceId) {
+        const { error } = await supabase
+          .from('services')
+          .update(serviceData)
+          .eq('id', editingServiceId);
 
-      // Se der erro, tratar diferentes casos
-      if (error) {
-        const isUserIdError = 
-          error.message?.includes('user_id') || 
-          error.message?.includes("column") && error.message?.includes("user_id") ||
-          error.code === '42703' ||
-          error.code === 'PGRST204' ||
-          error.message?.includes("Could not find the 'user_id' column");
-        
-        const isTitleError =
-          error.message?.includes('title') ||
-          error.code === '23502' && error.message?.includes('title');
-        
-        if (isUserIdError && !isTitleError) {
-          // Remover user_id e tentar novamente (mantendo title)
-          delete serviceData.user_id;
-          const retryResult = await supabase
-            .from('services')
-            .insert(serviceData);
-          
-          if (retryResult.error) {
-            throw retryResult.error;
+        if (error) {
+          // Tratar erros de title se necessário
+          if (error.message?.includes('title') || error.code === '23502') {
+            if (!serviceData.title) {
+              serviceData.title = serviceData.name;
+            }
+            const retryResult = await supabase
+              .from('services')
+              .update(serviceData)
+              .eq('id', editingServiceId);
+            
+            if (retryResult.error) {
+              throw retryResult.error;
+            }
+          } else {
+            throw error;
           }
-        } else if (isTitleError) {
-          // Se title não existir, tentar sem ele (mas isso não deveria acontecer)
-          // Se title existe mas está dando erro, garantir que está preenchido
-          if (!serviceData.title) {
-            serviceData.title = serviceData.name;
-          }
-          const retryResult = await supabase
-            .from('services')
-            .insert(serviceData);
-          
-          if (retryResult.error) {
-            throw retryResult.error;
-          }
-        } else {
-          // Outro tipo de erro, lançar normalmente
-          throw error;
         }
+
+        notification.success('Serviço atualizado com sucesso');
+        setEditingServiceId(null);
+      } else {
+        // Se não estiver editando, fazer INSERT
+        let { error } = await supabase
+          .from('services')
+          .insert(serviceData);
+
+        // Se der erro, tratar diferentes casos
+        if (error) {
+          const isUserIdError = 
+            error.message?.includes('user_id') || 
+            error.message?.includes("column") && error.message?.includes("user_id") ||
+            error.code === '42703' ||
+            error.code === 'PGRST204' ||
+            error.message?.includes("Could not find the 'user_id' column");
+          
+          const isTitleError =
+            error.message?.includes('title') ||
+            error.code === '23502' && error.message?.includes('title');
+          
+          if (isUserIdError && !isTitleError) {
+            // Remover user_id e tentar novamente (mantendo title)
+            delete serviceData.user_id;
+            const retryResult = await supabase
+              .from('services')
+              .insert(serviceData);
+            
+            if (retryResult.error) {
+              throw retryResult.error;
+            }
+          } else if (isTitleError) {
+            // Se title não existir, tentar sem ele (mas isso não deveria acontecer)
+            // Se title existe mas está dando erro, garantir que está preenchido
+            if (!serviceData.title) {
+              serviceData.title = serviceData.name;
+            }
+            const retryResult = await supabase
+              .from('services')
+              .insert(serviceData);
+            
+            if (retryResult.error) {
+              throw retryResult.error;
+            }
+          } else {
+            // Outro tipo de erro, lançar normalmente
+            throw error;
+          }
+        }
+
+        notification.success('Serviço criado com sucesso');
       }
 
-      toast.success('Serviço criado com sucesso');
-      
       // Limpar formulário
       setServiceForm({
         name: '',
         price: 0,
         durationMinutes: 30,
         durationHours: 0,
+        description: '',
       });
       
       setShowAddModal(false);
       fetchServices();
     } catch (error: any) {
       console.error('Erro ao salvar serviço:', error);
-      toast.error(error.message || 'Erro ao salvar serviço');
+      notification.error(error.message || 'Erro ao salvar serviço');
     }
   };
 
   const handleDeleteService = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir este serviço? Agendamentos futuros que usam este serviço não serão afetados, mas o serviço será removido da lista.')) return;
+    const confirmed = await confirm('Tem certeza que deseja excluir este serviço? Agendamentos futuros que usam este serviço não serão afetados, mas o serviço será removido da lista.');
+    if (!confirmed) return;
 
     try {
       const { error } = await supabase
@@ -216,11 +268,11 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
 
       if (error) throw error;
       
-      toast.success('Serviço excluído com sucesso');
+      notification.success('Serviço excluído com sucesso');
       fetchServices();
     } catch (error: any) {
       console.error('Erro ao deletar serviço:', error);
-      toast.error('Erro ao excluir serviço');
+      notification.error('Erro ao excluir serviço');
     }
   };
 
@@ -332,13 +384,22 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
                           )}
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleDeleteService(service.id)}
-                        className="p-2 hover:bg-destructive/20 text-destructive rounded-lg transition-colors ml-4"
-                        title="Excluir serviço"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleEditService(service)}
+                          className="p-2 hover:bg-primary/20 text-primary rounded-lg transition-colors"
+                          title="Editar serviço"
+                        >
+                          <Edit className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteService(service.id)}
+                          className="p-2 hover:bg-destructive/20 text-destructive rounded-lg transition-colors"
+                          title="Excluir serviço"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
                     </motion.div>
                   ))}
                 </div>
@@ -356,7 +417,17 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4"
-            onClick={() => setShowAddModal(false)}
+            onClick={() => {
+              setShowAddModal(false);
+              setEditingServiceId(null);
+              setServiceForm({
+                name: '',
+                price: 0,
+                durationMinutes: 30,
+                durationHours: 0,
+                description: '',
+              });
+            }}
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
@@ -365,7 +436,27 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
               onClick={(e) => e.stopPropagation()}
               className="bg-card rounded-xl p-6 w-full max-w-md border border-border"
             >
-              <h3 className="text-xl font-bold mb-4">Novo Serviço</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold">
+                  {editingServiceId ? 'Editar Serviço' : 'Novo Serviço'}
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setEditingServiceId(null);
+                    setServiceForm({
+                      name: '',
+                      price: 0,
+                      durationMinutes: 30,
+                      durationHours: 0,
+                      description: '',
+                    });
+                  }}
+                  className="p-2 hover:bg-muted rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
 
               <div className="space-y-4">
                 <div>
@@ -434,11 +525,37 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
                     Total: {formatDuration(serviceForm.durationHours * 60 + serviceForm.durationMinutes)}
                   </p>
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Descrição do serviço
+                  </label>
+                  <textarea
+                    value={serviceForm.description}
+                    onChange={(e) => setServiceForm({ ...serviceForm, description: e.target.value })}
+                    placeholder="Ex: Corte clássico e elegante para o dia a dia"
+                    rows={3}
+                    className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground resize-none"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Opcional - Adicione uma descrição detalhada do serviço
+                  </p>
+                </div>
               </div>
 
               <div className="flex gap-3 mt-6">
                 <button
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setEditingServiceId(null);
+                    setServiceForm({
+                      name: '',
+                      price: 0,
+                      durationMinutes: 30,
+                      durationHours: 0,
+                      description: '',
+                    });
+                  }}
                   className="flex-1 bg-secondary text-secondary-foreground py-2 rounded-lg font-medium"
                 >
                   Cancelar
@@ -447,7 +564,7 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
                   onClick={handleSaveService}
                   className="flex-1 bg-primary text-primary-foreground py-2 rounded-lg font-medium"
                 >
-                  Salvar Serviço
+                  {editingServiceId ? 'Atualizar Serviço' : 'Salvar Serviço'}
                 </button>
               </div>
             </motion.div>

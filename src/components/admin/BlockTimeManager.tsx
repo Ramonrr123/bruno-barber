@@ -5,7 +5,8 @@ import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { Exception } from '@/types/booking';
-import { toast } from 'sonner';
+import { notification } from '@/hooks/useNotification';
+import { showConfirm as confirm } from '@/hooks/useConfirm';
 
 interface BlockTimeManagerProps {
   isOpen: boolean;
@@ -90,7 +91,7 @@ export function BlockTimeManager({ isOpen, onClose }: BlockTimeManagerProps) {
       
       if (!isTableNotFound) {
         console.error('Erro ao buscar bloqueios:', error);
-        toast.error('Erro ao carregar bloqueios');
+        notification.error('Erro ao carregar bloqueios');
       }
       // Sempre retornar vazio em caso de erro
       setExceptions([]);
@@ -107,12 +108,12 @@ export function BlockTimeManager({ isOpen, onClose }: BlockTimeManagerProps) {
 
   const handleSaveException = async () => {
     if (!exceptionForm.date) {
-      toast.error('Data é obrigatória');
+      notification.error('Data é obrigatória');
       return;
     }
 
     if (!exceptionForm.is_all_day && (!exceptionForm.start_time || !exceptionForm.end_time)) {
-      toast.error('Horários são obrigatórios quando não é dia inteiro');
+      notification.error('Horários são obrigatórios quando não é dia inteiro');
       return;
     }
 
@@ -124,7 +125,7 @@ export function BlockTimeManager({ isOpen, onClose }: BlockTimeManagerProps) {
       const endMinutes = endHours * 60 + endMins;
 
       if (endMinutes <= startMinutes) {
-        toast.error('Horário de término deve ser maior que o horário de início');
+        notification.error('Horário de término deve ser maior que o horário de início');
         return;
       }
     }
@@ -133,7 +134,7 @@ export function BlockTimeManager({ isOpen, onClose }: BlockTimeManagerProps) {
       // Verificar se a tabela existe
       const tableExists = await checkTableExists(supabase);
       if (!tableExists) {
-        toast.error('Tabela exceptions não existe. Execute a migration primeiro.');
+        notification.error('Tabela exceptions não existe. Execute a migration primeiro.');
         return;
       }
 
@@ -157,7 +158,7 @@ export function BlockTimeManager({ isOpen, onClose }: BlockTimeManagerProps) {
 
       if (error) throw error;
 
-      toast.success('Bloqueio criado com sucesso');
+      notification.success('Bloqueio criado com sucesso');
       
       // Limpar formulário
       setExceptionForm({
@@ -172,12 +173,13 @@ export function BlockTimeManager({ isOpen, onClose }: BlockTimeManagerProps) {
       fetchExceptions();
     } catch (error: any) {
       console.error('Erro ao salvar bloqueio:', error);
-      toast.error(error.message || 'Erro ao salvar bloqueio');
+      notification.error(error.message || 'Erro ao salvar bloqueio');
     }
   };
 
   const handleDeleteException = async (id: string) => {
-    if (!confirm('Tem certeza que deseja remover este bloqueio? Isso liberará o horário para agendamentos.')) return;
+    const confirmed = await confirm('Tem certeza que deseja remover este bloqueio? Isso liberará o horário para agendamentos.');
+    if (!confirmed) return;
 
     try {
       const { error } = await supabase
@@ -187,11 +189,11 @@ export function BlockTimeManager({ isOpen, onClose }: BlockTimeManagerProps) {
 
       if (error) throw error;
       
-      toast.success('Bloqueio removido - horário liberado!');
+      notification.success('Bloqueio removido - horário liberado!');
       fetchExceptions();
     } catch (error: any) {
       console.error('Erro ao deletar bloqueio:', error);
-      toast.error('Erro ao remover bloqueio');
+      notification.error('Erro ao remover bloqueio');
     }
   };
 

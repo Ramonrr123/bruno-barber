@@ -21,7 +21,8 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Appointment, Service } from '@/types/booking';
-import { toast } from 'sonner';
+import { notification } from '@/hooks/useNotification';
+import { showConfirm as confirm } from '@/hooks/useConfirm';
 import { BlockTimeManager } from '@/components/admin/BlockTimeManager';
 import { ServicesManager } from '@/components/admin/ServicesManager';
 import { sendTelegramNotification } from '@/lib/telegram';
@@ -84,7 +85,7 @@ export default function Admin() {
       const now = new Date();
       const isToday = dateStr === format(now, 'yyyy-MM-dd');
       
-      console.log('Buscando agendamentos para:', dateStr);
+      // Buscando agendamentos para a data
       
       const { data, error } = await supabase
         .from('appointments')
@@ -104,11 +105,11 @@ export default function Admin() {
         return true;
       });
       
-      console.log('Agendamentos encontrados:', filteredData.length, filteredData);
+      // Agendamentos encontrados
       setAppointments(filteredData);
     } catch (error) {
       console.error('Error fetching appointments:', error);
-      toast.error('Erro ao carregar agenda');
+      notification.error('Erro ao carregar agenda');
     } finally {
       setIsLoading(false);
     }
@@ -166,7 +167,7 @@ export default function Admin() {
           filter: `appointment_date=eq.${dateStr}`,
         },
         (payload) => {
-          console.log('Mudança detectada na tabela appointments:', payload);
+          // Mudança detectada na tabela appointments
           // Recarregar agendamentos quando houver qualquer mudança
           fetchAppointments();
         }
@@ -184,10 +185,10 @@ export default function Admin() {
     try {
       await supabase.auth.signOut();
       navigate('/login', { replace: true });
-      toast.success('Logout realizado com sucesso');
+      notification.success('Logout realizado com sucesso');
     } catch (error) {
       console.error('Error logging out:', error);
-      toast.error('Erro ao fazer logout');
+      notification.error('Erro ao fazer logout');
     }
   };
 
@@ -200,17 +201,18 @@ export default function Admin() {
         .eq('id', id);
 
       if (error) throw error;
-      toast.success('Marcado como concluído');
+      notification.success('Marcado como concluído');
       fetchAppointments();
     } catch (error) {
       console.error('Error completing appointment:', error);
-      toast.error('Erro ao atualizar');
+      notification.error('Erro ao atualizar');
     }
   };
 
   // Cancelar agendamento
   const handleCancel = async (id: string) => {
-    if (!confirm('Tem certeza que deseja cancelar este agendamento?')) return;
+    const confirmed = await confirm('Tem certeza que deseja cancelar este agendamento?');
+    if (!confirmed) return;
     
     try {
       // Buscar dados do agendamento antes de cancelar (para enviar notificação)
@@ -248,17 +250,18 @@ export default function Admin() {
         });
       }
 
-      toast.success('Agendamento cancelado');
+      notification.success('Agendamento cancelado');
       fetchAppointments();
     } catch (error) {
       console.error('Error cancelling appointment:', error);
-      toast.error('Erro ao cancelar');
+      notification.error('Erro ao cancelar');
     }
   };
 
   // Marcar como não compareceu
   const handleNoShow = async (id: string) => {
-    if (!confirm('Marcar este agendamento como "Não Compareceu"?')) return;
+    const confirmed = await confirm('Marcar este agendamento como "Não Compareceu"?');
+    if (!confirmed) return;
     
     try {
       const { error } = await supabase
@@ -267,11 +270,11 @@ export default function Admin() {
         .eq('id', id);
 
       if (error) throw error;
-      toast.success('Marcado como não compareceu');
+      notification.success('Marcado como não compareceu');
       fetchAppointments();
     } catch (error) {
       console.error('Error marking no show:', error);
-      toast.error('Erro ao atualizar');
+      notification.error('Erro ao atualizar');
     }
   };
 
@@ -352,7 +355,7 @@ export default function Admin() {
   // Salvar encaixe manual
   const handleManualBooking = async () => {
     if (!manualBooking.clientName || !manualBooking.clientPhone || !manualBooking.serviceType) {
-      toast.error('Preencha todos os campos obrigatórios');
+      notification.error('Preencha todos os campos obrigatórios');
       return;
     }
 
@@ -377,7 +380,7 @@ export default function Admin() {
 
       if (error) throw error;
       
-      toast.success('Encaixe criado com sucesso!');
+      notification.success('Encaixe criado com sucesso!');
       setShowManualBookingModal(false);
       setManualBooking({
         clientName: '',
@@ -391,7 +394,7 @@ export default function Admin() {
       fetchAppointments();
     } catch (error: any) {
       console.error('Error creating manual booking:', error);
-      toast.error(error.message || 'Erro ao criar encaixe');
+      notification.error(error.message || 'Erro ao criar encaixe');
     }
   };
 
