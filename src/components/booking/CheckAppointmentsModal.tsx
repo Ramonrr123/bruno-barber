@@ -7,6 +7,7 @@ import { format, parseISO, isAfter, startOfToday } from 'date-fns';
 import { BARBER_NAME } from '@/data/constants';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { sendTelegramNotification } from '@/lib/telegram';
 
 interface CheckAppointmentsModalProps {
   isOpen: boolean;
@@ -94,12 +95,40 @@ export function CheckAppointmentsModal({ isOpen, onClose }: CheckAppointmentsMod
         return;
       }
 
+      // Buscar dados do agendamento antes de cancelar (para enviar notificação)
+      const { data: appointmentData, error: fetchError } = await supabase
+        .from('appointments')
+        .select('client_name, client_phone, service_type')
+        .eq('id', appointmentId)
+        .single();
+
+      if (fetchError) {
+        console.error('Erro ao buscar dados do agendamento:', fetchError);
+      }
+
       const { error } = await supabase
         .from('appointments')
         .update({ status: 'cancelled' })
         .eq('id', appointmentId);
 
       if (error) throw error;
+
+      // Enviar notificação do Telegram (fire-and-forget, não bloqueia a resposta)
+      if (appointmentData) {
+        const formattedDate = format(parseISO(appointmentDate), 'dd/MM', { locale: ptBR });
+        const formattedDateTime = `${formattedDate} às ${appointmentTime.slice(0, 5)}`;
+        
+        sendTelegramNotification({
+          type: 'CANCELED',
+          clientName: appointmentData.client_name,
+          phone: appointmentData.client_phone,
+          serviceName: appointmentData.service_type,
+          date: formattedDateTime,
+        }).catch((error) => {
+          console.error('Erro ao enviar notificação do Telegram:', error);
+          // Não mostra erro para o usuário, pois a operação principal já foi bem-sucedida
+        });
+      }
 
       toast.success('Agendamento cancelado! O horário está disponível novamente.');
       

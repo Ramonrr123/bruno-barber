@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { BARBER_NAME } from '@/data/constants';
 import { getServiceIcon } from '@/lib/serviceIcons';
 import { formatDuration } from '@/lib/formatDuration';
+import { sendTelegramNotification } from '@/lib/telegram';
 
 interface ClientInfoFormProps {
   service: Service;
@@ -174,6 +175,21 @@ export function ClientInfoForm({
       }
 
       console.log('Agendamento salvo com sucesso!', insertedData);
+
+      // Enviar notificação do Telegram (fire-and-forget, não bloqueia a resposta)
+      const formattedDate = format(date, 'dd/MM', { locale: ptBR });
+      const formattedDateTime = `${formattedDate} às ${time.slice(0, 5)}`;
+      
+      sendTelegramNotification({
+        type: 'NEW_APPOINTMENT',
+        clientName: name.trim(),
+        phone: phone.replace(/\D/g, ''),
+        serviceName: service.name,
+        date: formattedDateTime,
+      }).catch((error) => {
+        console.error('Erro ao enviar notificação do Telegram:', error);
+        // Não mostra erro para o usuário, pois a operação principal já foi bem-sucedida
+      });
 
       onUpdateClientInfo(name.trim(), phone);
       toast.success('Agendamento confirmado e salvo no banco!');

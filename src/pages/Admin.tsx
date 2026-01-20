@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { format, addDays, subDays, isToday } from 'date-fns';
+import { format, addDays, subDays, isToday, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
   Clock, 
@@ -24,6 +24,7 @@ import { Appointment, Service } from '@/types/booking';
 import { toast } from 'sonner';
 import { BlockTimeManager } from '@/components/admin/BlockTimeManager';
 import { ServicesManager } from '@/components/admin/ServicesManager';
+import { sendTelegramNotification } from '@/lib/telegram';
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -212,12 +213,41 @@ export default function Admin() {
     if (!confirm('Tem certeza que deseja cancelar este agendamento?')) return;
     
     try {
+      // Buscar dados do agendamento antes de cancelar (para enviar notificação)
+      const { data: appointmentData, error: fetchError } = await supabase
+        .from('appointments')
+        .select('client_name, client_phone, service_type, appointment_date, start_time')
+        .eq('id', id)
+        .single();
+
+      if (fetchError) {
+        console.error('Erro ao buscar dados do agendamento:', fetchError);
+      }
+
       const { error } = await supabase
         .from('appointments')
         .update({ status: 'cancelled' })
         .eq('id', id);
 
       if (error) throw error;
+
+      // Enviar notificação do Telegram (fire-and-forget, não bloqueia a resposta)
+      if (appointmentData) {
+        const formattedDate = format(parseISO(appointmentData.appointment_date), 'dd/MM', { locale: ptBR });
+        const formattedDateTime = `${formattedDate} às ${appointmentData.start_time.slice(0, 5)}`;
+        
+        sendTelegramNotification({
+          type: 'CANCELED',
+          clientName: appointmentData.client_name,
+          phone: appointmentData.client_phone,
+          serviceName: appointmentData.service_type,
+          date: formattedDateTime,
+        }).catch((error) => {
+          console.error('Erro ao enviar notificação do Telegram:', error);
+          // Não mostra erro para o usuário, pois a operação principal já foi bem-sucedida
+        });
+      }
+
       toast.success('Agendamento cancelado');
       fetchAppointments();
     } catch (error) {
