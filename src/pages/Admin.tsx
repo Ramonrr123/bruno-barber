@@ -428,39 +428,47 @@ export default function Admin() {
   return (
     <div className="min-h-screen bg-background p-4 pb-24">
       <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">🐸</span>
-            <h1 className="text-xl font-bold text-foreground">Agenda</h1>
+        {/* Header Mobile-First */}
+        <div className="mb-6 space-y-3">
+          {/* Barra Superior - Logo e Sair */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🐸</span>
+              <h1 className="text-lg sm:text-xl font-bold text-foreground">Agenda</h1>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="flex items-center justify-center w-10 h-10 sm:w-auto sm:h-auto sm:px-3 sm:py-2 bg-secondary/50 text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors sm:gap-2 border border-border"
+              aria-label="Sair"
+              title="Sair"
+            >
+              <LogOut className="w-5 h-5" />
+              <span className="hidden sm:inline text-sm font-medium">Sair</span>
+            </button>
           </div>
-          <div className="flex items-center gap-3">
+          
+          {/* Grid de Configurações - Mobile-First */}
+          <div className="grid grid-cols-2 gap-2 sm:gap-3">
             {/* Botão de Serviços */}
             <button
               onClick={() => setShowServicesManager(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary border border-primary/20 rounded-lg hover:bg-primary/20 transition-all font-medium"
+              className="flex flex-col items-center justify-center gap-1.5 sm:flex-row sm:gap-2 px-3 py-3 sm:py-2.5 bg-primary/10 text-primary border border-primary/20 rounded-xl hover:bg-primary/20 active:scale-95 transition-all font-medium text-xs sm:text-sm min-h-[64px] sm:min-h-0"
               aria-label="Gerenciar Serviços"
               title="Gerenciar serviços oferecidos"
             >
-              <Scissors className="w-5 h-5" />
-              <span className="hidden sm:inline">Serviços</span>
+              <Scissors className="w-5 h-5 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="text-center">Serviços</span>
             </button>
+            
             {/* Botão de Bloqueios de Horário - Destaque */}
             <button
               onClick={() => setShowBlockTimeManager(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all font-medium shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30"
+              className="flex flex-col items-center justify-center gap-1.5 sm:flex-row sm:gap-2 px-3 py-3 sm:py-2.5 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 active:scale-95 transition-all font-medium text-xs sm:text-sm shadow-md shadow-primary/20 min-h-[64px] sm:min-h-0"
               aria-label="Bloqueios de Horário"
               title="Bloquear horários ou dias inteiros"
             >
-              <Ban className="w-5 h-5" />
-              <span className="hidden sm:inline">Bloquear Horário</span>
-            </button>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors text-sm font-medium"
-            >
-              <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">Sair</span>
+              <Ban className="w-5 h-5 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="text-center">Bloquear</span>
             </button>
           </div>
         </div>

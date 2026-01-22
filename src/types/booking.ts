@@ -33,17 +33,6 @@ export interface Appointment {
   admin_notes?: string;
 }
 
-export interface ScheduleOverride {
-  id: string;
-  date: string;
-  is_open: boolean;
-  start_time: string | null;
-  end_time: string | null;
-  reason: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface Exception {
   id: string;
   date: string; // YYYY-MM-DD

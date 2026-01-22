@@ -1,13 +1,11 @@
 /**
  * Lógica de Disponibilidade - Ordem de Prioridade
  * 
- * Passo A: Verificar Exceções (schedule_overrides)
- * Passo B: Verificar Regra Global (dias da semana padrão)
- * Passo C: Filtrar Agendamentos (appointments)
+ * Passo A: Verificar Regra Global (dias da semana padrão)
+ * Passo B: Filtrar Agendamentos (appointments)
  */
 
 import { format } from 'date-fns';
-import { ScheduleOverride } from '@/types/booking';
 
 // Dias da semana padrão (0 = Domingo, 6 = Sábado)
 // Por padrão: Segunda a Sexta (1-5) e Sábado (6) estão abertos
@@ -107,75 +105,7 @@ export async function checkDateAvailability(
   const dayOfWeek = date.getDay(); // 0 = Domingo, 6 = Sábado
 
   // ============================================
-  // PASSO A: Verificar Exceções (schedule_overrides)
-  // ============================================
-  try {
-    const { data: override, error: overrideError } = await supabase
-      .from('schedule_overrides')
-      .select('*')
-      .eq('date', dateStr)
-      .maybeSingle(); // Usar maybeSingle para não dar erro se não encontrar
-
-    // Se não houver erro e encontrou uma exceção
-    if (!overrideError && override) {
-      // Exceção encontrada - tem poder de veto
-      if (!override.is_open) {
-        // Dia fechado por exceção
-        return {
-          isAvailable: false,
-          startTime: null,
-          endTime: null,
-          reason: override.reason || 'Dia fechado por exceção',
-        };
-      } else {
-        // Dia aberto por exceção - usar horários da exceção ou horário padrão do dia
-        const daySchedule = getDaySchedule(dayOfWeek);
-        return {
-          isAvailable: true,
-          startTime: override.start_time || daySchedule?.startTime || WEEKDAY_START_TIME,
-          endTime: override.end_time || daySchedule?.endTime || WEEKDAY_END_TIME,
-          reason: override.reason || 'Dia aberto por exceção',
-        };
-      }
-    }
-    
-    // Se houver erro mas for 404 ou tabela não existe, continuar com regra global
-    // (Isso permite que o sistema funcione mesmo se a tabela ainda não foi criada)
-    if (overrideError) {
-      // Verificar se é erro de tabela não encontrada
-      const isTableNotFound = 
-        overrideError.code === 'PGRST116' || 
-        overrideError.code === '42P01' || 
-        overrideError.code === 'PGRST205' ||
-        overrideError.code === '42883' ||
-        overrideError.message?.includes('Could not find the table') ||
-        overrideError.message?.includes('relation "public.schedule_overrides" does not exist');
-      
-      if (isTableNotFound) {
-        // Tabela não existe - continuar silenciosamente com regra global
-        // Não logar nada para não poluir o console
-      } else {
-        // Outro tipo de erro - logar apenas em modo debug
-        console.debug('Erro ao buscar exceções (continuando com regra global):', overrideError);
-      }
-    }
-  } catch (error: any) {
-    // Verificar se é erro de tabela não encontrada
-    const isTableNotFound = 
-      error?.code === 'PGRST116' || 
-      error?.code === '42P01' || 
-      error?.code === 'PGRST205' ||
-      error?.message?.includes('Could not find the table') ||
-      error?.message?.includes('relation "public.schedule_overrides" does not exist');
-    
-    if (!isTableNotFound) {
-      // Apenas logar se não for erro de tabela não encontrada
-      console.debug('Erro ao verificar exceções (continuando com regra global):', error);
-    }
-  }
-
-  // ============================================
-  // PASSO B: Verificar Regra Global (dias da semana)
+  // PASSO A: Verificar Regra Global (dias da semana)
   // ============================================
   // Domingo (0) e outros dias não incluídos em DEFAULT_OPEN_DAYS estão fechados
   if (!DEFAULT_OPEN_DAYS.includes(dayOfWeek)) {

@@ -7,7 +7,7 @@ export async function GET() {
     await sendTelegramNotification({
       type: 'NEW_APPOINTMENT',
       clientName: 'Teste da Silva',
-      phone: '47997074833', // Teste com formatação suja pra ver se limpa
+      phone: '47988488471', // Teste com formatação suja pra ver se limpa
       serviceName: 'Corte Blindado',
       date: 'Hoje às 20:00'
     });
