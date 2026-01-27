@@ -109,7 +109,7 @@ export function ClientInfoForm({
       });
       
       if (hasConflict) {
-        toast.error('Este horário já foi reservado. Escolha outro horário.');
+        notification.error('Este horário já foi reservado. Escolha outro horário.');
         onBack();
         return;
       }
@@ -164,7 +164,7 @@ export function ClientInfoForm({
         if (insertError.message?.includes('column') && insertError.message?.includes('does not exist')) {
           const columnMatch = insertError.message.match(/column "(\w+)" does not exist/);
           const columnName = columnMatch ? columnMatch[1] : 'desconhecida';
-          errorMessage = `Erro: Coluna "${columnName}" não existe no banco. Execute o SQL de correção no Supabase.`;
+          errorMessage = `Erro: Coluna "${columnName}" não existe. Execute o SQL de correção no Supabase.`;
         } else if (insertError.message?.includes('null value') && insertError.message?.includes('violates not-null constraint')) {
           const columnMatch = insertError.message.match(/column "(\w+)" of relation/);
           const columnName = columnMatch ? columnMatch[1] : 'desconhecida';
@@ -177,7 +177,7 @@ export function ClientInfoForm({
           errorMessage = `Erro: ${insertError.message || insertError.code || 'Erro desconhecido'}`;
         }
         
-        toast.error(errorMessage);
+        notification.error(errorMessage);
         throw insertError;
       }
 
@@ -199,7 +199,7 @@ export function ClientInfoForm({
       });
 
       onUpdateClientInfo(name.trim(), phone);
-      notification.success('Agendamento confirmado e salvo no banco!');
+      notification.success('Agendamento confirmado com sucesso!');
       onConfirm();
     } catch (error) {
       console.error('Error creating appointment:', error);
