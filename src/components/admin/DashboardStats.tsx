@@ -53,7 +53,7 @@ export function DashboardStats() {
         // 1) Buscar agendamentos do mês atual com status EXATAMENTE 'confirmed'
         const { data: appts, error: apptError } = await supabase
           .from('appointments')
-          .select('id, service_type, appointment_date, status')
+          .select('service_type')
           .eq('status', 'confirmed')
           .gte('appointment_date', startDateStr)
           .lt('appointment_date', endDateStr);
@@ -87,13 +87,14 @@ export function DashboardStats() {
         });
 
         const revenue = appointments.reduce((sum, a) => {
+          if (!a.service_type) return sum;
           const price = priceByName.get(a.service_type) ?? 0;
           return sum + price;
         }, 0);
 
         if (!isMounted) return;
         setRevenue(Number.isFinite(revenue) ? revenue : 0);
-      } catch (e) {
+      } catch {
         // Falha silenciosa: dashboard não deve quebrar o /admin
         if (!isMounted) return;
         setRevenue(0);
