@@ -1,10 +1,19 @@
 import { motion } from 'framer-motion';
-import { Check, Calendar, Clock } from 'lucide-react';
+import { Check, Calendar, Clock, MapPin, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { BookingData } from '@/types/booking';
 import { BARBER_NAME } from '@/data/constants';
 import { getServiceIcon } from '@/lib/serviceIcons';
+
+// Dados do endereço da barbearia
+const BARBERSHOP_ADDRESS = {
+  street: 'Rua Henrique Sorg, 310',
+  neighborhood: 'Jardim Esperança',
+  city: 'Canoinhas - SC',
+  fullAddress: 'Rua Henrique Sorg, 310, Jardim Esperança, Canoinhas - SC',
+  googleMapsUrl: 'https://www.google.com/maps/search/?api=1&query=Rua+Henrique+Sorg,+310,+Jardim+Esperança,+Canoinhas+SC'
+};
 
 interface ConfirmationProps {
   bookingData: BookingData;
@@ -89,6 +98,42 @@ export function Confirmation({ bookingData, onNewBooking }: ConfirmationProps) {
           <div className="flex items-center gap-2 text-foreground">
             <Clock className="w-4 h-4 text-primary/80" />
             <span className="font-semibold">{time} - {endTime} • Profissional: {BARBER_NAME}</span>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Location Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6 }}
+        className="w-full bg-zinc-900/50 rounded-xl p-5 mb-6 border border-zinc-800"
+      >
+        <div className="flex items-start gap-4">
+          <div className="flex-shrink-0">
+            <div className="w-12 h-12 rounded-lg bg-green-600/20 flex items-center justify-center border border-green-600/30">
+              <MapPin className="w-6 h-6 text-green-500" />
+            </div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-foreground mb-2 text-base">
+              Nossa Localização
+            </h3>
+            <div className="space-y-1 text-sm text-muted-foreground mb-4">
+              <p>{BARBERSHOP_ADDRESS.street}</p>
+              <p>{BARBERSHOP_ADDRESS.neighborhood}</p>
+              <p>{BARBERSHOP_ADDRESS.city}</p>
+            </div>
+            <a
+              href={BARBERSHOP_ADDRESS.googleMapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-all hover:shadow-lg hover:shadow-green-600/30 active:scale-[0.98]"
+            >
+              <MapPin className="w-4 h-4" />
+              <span>Como Chegar</span>
+              <ExternalLink className="w-4 h-4" />
+            </a>
           </div>
         </div>
       </motion.div>

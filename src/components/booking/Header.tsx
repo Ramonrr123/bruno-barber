@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar } from 'lucide-react';
+import { Calendar, MapPin } from 'lucide-react';
 import { CheckAppointmentsModal } from './CheckAppointmentsModal';
+
+// Dados do endereço da barbearia
+const BARBERSHOP_ADDRESS_SHORT = 'Rua Henrique Sorg, 310 - Canoinhas';
 
 export function Header() {
   const [showCheckModal, setShowCheckModal] = useState(false);
@@ -26,9 +29,16 @@ export function Header() {
             target.style.display = 'none';
           }}
         />
-        <p className="text-muted-foreground text-sm mb-3">
+        <p className="text-muted-foreground text-sm mb-2">
           Agende seu horário em segundos
         </p>
+        
+        {/* Address Badge */}
+        <div className="flex items-center justify-center gap-1.5 mb-3 text-xs text-zinc-400">
+          <MapPin className="w-3 h-3" />
+          <span>{BARBERSHOP_ADDRESS_SHORT}</span>
+        </div>
+
         <motion.button
           onClick={() => setShowCheckModal(true)}
           whileHover={{ scale: 1.05 }}

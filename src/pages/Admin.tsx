@@ -25,6 +25,7 @@ import { notification } from '@/hooks/useNotification';
 import { showConfirm as confirm } from '@/hooks/useConfirm';
 import { BlockTimeManager } from '@/components/admin/BlockTimeManager';
 import { ServicesManager } from '@/components/admin/ServicesManager';
+import { DashboardStats } from '@/components/admin/DashboardStats';
 import { sendTelegramNotification } from '@/lib/telegram';
 
 export default function Admin() {
@@ -473,6 +474,9 @@ export default function Admin() {
             </button>
           </div>
         </div>
+
+        {/* Dashboard Financeiro (Mês Atual) */}
+        <DashboardStats />
 
         {/* Navegação de Datas */}
         <div className="flex items-center justify-between glass-card rounded-xl p-4 mb-6">
