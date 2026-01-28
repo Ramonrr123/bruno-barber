@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, Trash2, Clock, DollarSign, Scissors, Edit } from 'lucide-react';
+import { X, Plus, Trash2, Clock, DollarSign, Scissors, Edit, Upload, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Service } from '@/types/booking';
 import { notification } from '@/hooks/useNotification';
@@ -31,6 +31,12 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
     durationHours: 0,
     description: '',
   });
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
+  const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null); // Para rastrear imagem original ao editar
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Buscar serviços
   const fetchServices = async () => {
@@ -82,6 +88,7 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
         price: typeof service.price === 'number' ? service.price : parseFloat(String(service.price)),
         description: service.description || '',
         icon: service.icon || 'scissors',
+        image_url: service.image_url || null,
       }));
 
       setServices(formattedServices);
@@ -113,8 +120,82 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
       description: service.description || '',
     });
     
+    // Configurar imagem atual se existir
+    const imageUrl = service.image_url || null;
+    setCurrentImageUrl(imageUrl);
+    setOriginalImageUrl(imageUrl); // Guardar imagem original para comparação
+    setImagePreview(null);
+    setSelectedImage(null);
+    
     setEditingServiceId(service.id);
     setShowAddModal(true);
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validar tipo de arquivo
+    if (!file.type.startsWith('image/')) {
+      notification.error('Por favor, selecione apenas arquivos de imagem');
+      return;
+    }
+
+    // Validar tamanho (máximo 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      notification.error('A imagem deve ter no máximo 5MB');
+      return;
+    }
+
+    setSelectedImage(file);
+    
+    // Criar preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+    setCurrentImageUrl(null); // Limpar também a URL da imagem salva
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const uploadImage = async (file: File): Promise<string | null> => {
+    try {
+      // Gerar nome único para o arquivo
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `services/${fileName}`;
+
+      // Fazer upload para o bucket
+      const { error: uploadError } = await supabase.storage
+        .from('service-images')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.error('Erro ao fazer upload:', uploadError);
+        throw uploadError;
+      }
+
+      // Obter URL pública
+      const { data } = supabase.storage
+        .from('service-images')
+        .getPublicUrl(filePath);
+
+      return data.publicUrl;
+    } catch (error: any) {
+      console.error('Erro ao fazer upload da imagem:', error);
+      throw error;
+    }
   };
 
   const handleSaveService = async () => {
@@ -137,12 +218,67 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
       return;
     }
 
+    setIsUploading(true);
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
         notification.error('Usuário não autenticado');
+        setIsUploading(false);
         return;
+      }
+
+      let imageUrl: string | null = null;
+
+      // Se uma nova imagem foi selecionada, fazer upload
+      if (selectedImage) {
+        try {
+          // Se estava editando e tinha imagem antiga, deletar a antiga
+          if (editingServiceId && originalImageUrl) {
+            try {
+              // Extrair o caminho do arquivo da URL
+              const urlParts = originalImageUrl.split('/service-images/');
+              if (urlParts.length > 1) {
+                const oldFilePath = `services/${urlParts[1]}`;
+                await supabase.storage
+                  .from('service-images')
+                  .remove([oldFilePath]);
+              }
+            } catch (deleteError) {
+              console.warn('Erro ao deletar imagem antiga:', deleteError);
+              // Não bloquear o processo se falhar ao deletar
+            }
+          }
+
+          imageUrl = await uploadImage(selectedImage);
+        } catch (error: any) {
+          notification.error('Erro ao fazer upload da imagem. Tente novamente.');
+          setIsUploading(false);
+          return;
+        }
+      } else if (editingServiceId && originalImageUrl && !currentImageUrl) {
+        // Se está editando, tinha imagem original, mas agora currentImageUrl é null,
+        // significa que o usuário removeu a imagem, então deletar e setar como null
+        try {
+          const urlParts = originalImageUrl.split('/service-images/');
+          if (urlParts.length > 1) {
+            const oldFilePath = `services/${urlParts[1]}`;
+            await supabase.storage
+              .from('service-images')
+              .remove([oldFilePath]);
+          }
+        } catch (deleteError) {
+          console.warn('Erro ao deletar imagem removida:', deleteError);
+          // Não bloquear o processo se falhar ao deletar
+        }
+        imageUrl = null;
+      } else if (currentImageUrl) {
+        // Se há imagem atual (não foi removida), manter
+        imageUrl = currentImageUrl;
+      } else {
+        // Caso padrão: null (sem imagem)
+        imageUrl = null;
       }
 
       // Preparar dados do serviço
@@ -153,6 +289,7 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
         title: serviceName, // Sempre preencher title (coluna pode existir)
         price: serviceForm.price,
         duration: totalMinutes,
+        image_url: imageUrl,
         // NÃO adicionar user_id para que os serviços sejam públicos
         // user_id será NULL por padrão, permitindo que todos vejam
       };
@@ -248,11 +385,21 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
         description: '',
       });
       
+      setSelectedImage(null);
+      setImagePreview(null);
+      setCurrentImageUrl(null);
+      setOriginalImageUrl(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      
       setShowAddModal(false);
       fetchServices();
     } catch (error: any) {
       console.error('Erro ao salvar serviço:', error);
       notification.error(error.message || 'Erro ao salvar serviço');
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -356,8 +503,16 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
                       className="glass-card rounded-xl p-4 flex items-center justify-between border border-border"
                     >
                       <div className="flex items-center gap-4 flex-1">
-                        <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center border border-white/5 flex-shrink-0">
-                          <Scissors className="w-6 h-6 text-primary/80" />
+                        <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center border border-white/5 flex-shrink-0 overflow-hidden">
+                          {service.image_url ? (
+                            <img 
+                              src={service.image_url} 
+                              alt={service.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <Scissors className="w-6 h-6 text-primary/80" />
+                          )}
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-foreground text-base mb-1">
@@ -427,6 +582,13 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
                 durationHours: 0,
                 description: '',
               });
+              setSelectedImage(null);
+              setImagePreview(null);
+              setCurrentImageUrl(null);
+              setOriginalImageUrl(null);
+              if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+              }
             }}
           >
             <motion.div
@@ -434,7 +596,7 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-card rounded-xl p-6 w-full max-w-md border border-border"
+              className="bg-card rounded-xl p-4 sm:p-6 w-full max-w-md border border-border max-h-[90vh] overflow-y-auto"
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold">
@@ -458,9 +620,9 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
                 </button>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2">
+                  <label className="block text-sm font-medium mb-1.5 sm:mb-2">
                     Nome do Serviço <span className="text-destructive">*</span>
                   </label>
                   <input
@@ -468,12 +630,12 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
                     value={serviceForm.name}
                     onChange={(e) => setServiceForm({ ...serviceForm, name: e.target.value })}
                     placeholder="Ex: Corte Social, Barba, etc."
-                    className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground"
+                    className="w-full bg-background border border-border rounded-lg px-3 sm:px-4 py-2 text-sm sm:text-base text-foreground"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2">
+                  <label className="block text-sm font-medium mb-1.5 sm:mb-2">
                     Preço (R$) <span className="text-destructive">*</span>
                   </label>
                   <input
@@ -483,12 +645,12 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
                     value={serviceForm.price || ''}
                     onChange={(e) => setServiceForm({ ...serviceForm, price: parseFloat(e.target.value) || 0 })}
                     placeholder="0.00"
-                    className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground"
+                    className="w-full bg-background border border-border rounded-lg px-3 sm:px-4 py-2 text-sm sm:text-base text-foreground"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2">
+                  <label className="block text-sm font-medium mb-1.5 sm:mb-2">
                     Duração <span className="text-destructive">*</span>
                   </label>
                   <div className="flex gap-2">
@@ -503,7 +665,7 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
                           ...serviceForm, 
                           durationHours: parseInt(e.target.value) || 0 
                         })}
-                        className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground"
+                        className="w-full bg-background border border-border rounded-lg px-3 sm:px-4 py-2 text-sm sm:text-base text-foreground"
                       />
                     </div>
                     <div className="flex-1">
@@ -517,7 +679,7 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
                           ...serviceForm, 
                           durationMinutes: parseInt(e.target.value) || 0 
                         })}
-                        className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground"
+                        className="w-full bg-background border border-border rounded-lg px-3 sm:px-4 py-2 text-sm sm:text-base text-foreground"
                       />
                     </div>
                   </div>
@@ -527,23 +689,75 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2">
+                  <label className="block text-sm font-medium mb-1.5 sm:mb-2">
                     Descrição do serviço
                   </label>
                   <textarea
                     value={serviceForm.description}
                     onChange={(e) => setServiceForm({ ...serviceForm, description: e.target.value })}
                     placeholder="Ex: Corte clássico e elegante para o dia a dia"
-                    rows={3}
-                    className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground resize-none"
+                    rows={2}
+                    className="w-full bg-background border border-border rounded-lg px-3 sm:px-4 py-2 text-sm sm:text-base text-foreground resize-none"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
                     Opcional - Adicione uma descrição detalhada do serviço
                   </p>
                 </div>
+
+                {/* Upload de Imagem */}
+                <div>
+                  <label className="block text-sm font-medium mb-1.5 sm:mb-2">
+                    Foto do Serviço <span className="text-muted-foreground">(opcional)</span>
+                  </label>
+                  
+                  {/* Preview da imagem */}
+                  {(imagePreview || currentImageUrl) && (
+                    <div className="relative mb-3">
+                      <div className="w-full h-32 sm:h-40 rounded-lg overflow-hidden border border-border bg-background flex items-center justify-center">
+                        <img 
+                          src={imagePreview || currentImageUrl || ''} 
+                          alt="Preview"
+                          className="max-w-full max-h-full object-cover"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRemoveImage}
+                        className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 p-1.5 sm:p-2 bg-destructive/80 hover:bg-destructive text-white rounded-full transition-colors"
+                        title="Remover imagem"
+                      >
+                        <X className="w-3 h-3 sm:w-4 sm:h-4" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Input de arquivo */}
+                  <div className="flex items-center gap-3">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageSelect}
+                      className="hidden"
+                      id="service-image-upload"
+                    />
+                    <label
+                      htmlFor="service-image-upload"
+                      className="flex-1 flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-3 border border-border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+                    >
+                      <Upload className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
+                      <span className="text-xs sm:text-sm text-foreground">
+                        {imagePreview || currentImageUrl ? 'Trocar imagem' : 'Selecionar imagem'}
+                      </span>
+                    </label>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Formatos aceitos: JPG, PNG, WEBP, GIF. Tamanho máximo: 5MB
+                  </p>
+                </div>
               </div>
 
-              <div className="flex gap-3 mt-6">
+              <div className="flex gap-2 sm:gap-3 mt-4 sm:mt-6">
                 <button
                   onClick={() => {
                     setShowAddModal(false);
@@ -555,16 +769,32 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
                       durationHours: 0,
                       description: '',
                     });
+              setSelectedImage(null);
+              setImagePreview(null);
+              setCurrentImageUrl(null);
+              setOriginalImageUrl(null);
+              if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+              }
                   }}
-                  className="flex-1 bg-secondary text-secondary-foreground py-2 rounded-lg font-medium"
+                  className="flex-1 bg-secondary text-secondary-foreground py-2 sm:py-2.5 rounded-lg font-medium text-sm sm:text-base"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleSaveService}
-                  className="flex-1 bg-primary text-primary-foreground py-2 rounded-lg font-medium"
+                  disabled={isUploading}
+                  className="flex-1 bg-primary text-primary-foreground py-2 sm:py-2.5 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm sm:text-base"
                 >
-                  {editingServiceId ? 'Atualizar Serviço' : 'Salvar Serviço'}
+                  {isUploading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span className="hidden sm:inline">{selectedImage ? 'Enviando imagem...' : 'Salvando...'}</span>
+                      <span className="sm:hidden">{selectedImage ? 'Enviando...' : 'Salvando...'}</span>
+                    </>
+                  ) : (
+                    editingServiceId ? 'Atualizar' : 'Salvar'
+                  )}
                 </button>
               </div>
             </motion.div>

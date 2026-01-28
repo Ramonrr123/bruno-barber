@@ -22,7 +22,7 @@ export function ServiceSelection({ onSelect }: ServiceSelectionProps) {
         
         const { data, error: fetchError } = await supabase
           .from('services')
-          .select('id, name, duration, price, description, icon')
+          .select('id, name, duration, price, description, icon, image_url')
           .order('name', { ascending: true });
 
         if (fetchError) {
@@ -38,6 +38,7 @@ export function ServiceSelection({ onSelect }: ServiceSelectionProps) {
           price: typeof service.price === 'number' ? service.price : parseFloat(String(service.price)),
           description: service.description || '',
           icon: service.icon || 'scissors', // Fallback para 'scissors' ao invés de emoji
+          image_url: service.image_url || null,
         }));
 
         setServices(formattedServices);

@@ -23,11 +23,21 @@ export function ServiceCard({ service, onSelect, index }: ServiceCardProps) {
       className="w-full glass-card rounded-xl p-5 text-left transition-all border border-white/10 hover:border-primary/20 hover:shadow-xl hover:shadow-primary/5 active:scale-[0.98] backdrop-blur-xl"
     >
       <div className="flex items-start gap-4">
-        {/* Icon profissional em destaque à esquerda */}
+        {/* Imagem ou ícone profissional em destaque à esquerda */}
         <div className="flex-shrink-0 pt-1">
-          <div className="w-14 h-14 rounded-lg bg-primary/10 flex items-center justify-center border border-white/5">
-            <IconComponent className="w-7 h-7 text-primary/80" />
-          </div>
+          {service.image_url ? (
+            <div className="w-14 h-14 rounded-lg overflow-hidden border border-white/5 bg-primary/10">
+              <img 
+                src={service.image_url} 
+                alt={service.name}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          ) : (
+            <div className="w-14 h-14 rounded-lg bg-primary/10 flex items-center justify-center border border-white/5">
+              <IconComponent className="w-7 h-7 text-primary/80" />
+            </div>
+          )}
         </div>
 
         {/* Conteúdo principal */}

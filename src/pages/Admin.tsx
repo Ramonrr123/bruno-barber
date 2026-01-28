@@ -120,7 +120,7 @@ export default function Admin() {
     try {
       const { data, error } = await supabase
         .from('services')
-        .select('id, name, duration, price, description, icon')
+        .select('id, name, duration, price, description, icon, image_url')
         .order('name', { ascending: true });
 
       if (error) throw error;
@@ -132,6 +132,7 @@ export default function Admin() {
         price: typeof service.price === 'number' ? service.price : parseFloat(String(service.price)),
         description: service.description || '',
         icon: service.icon || 'scissors',
+        image_url: service.image_url || null,
       }));
       
       setServices(formattedServices);

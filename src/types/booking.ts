@@ -5,6 +5,7 @@ export interface Service {
   price: number;
   description: string;
   icon: string;
+  image_url?: string | null; // URL da imagem do serviço
 }
 
 export interface TimeSlot {
