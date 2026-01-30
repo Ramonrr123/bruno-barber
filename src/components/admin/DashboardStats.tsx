@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { DollarSign, Calendar } from 'lucide-react';
+import { DollarSign, Calendar, CalendarDays } from 'lucide-react';
 import { addMonths, format, startOfMonth } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 
 function formatBRL(value: number) {
@@ -10,17 +11,28 @@ function formatBRL(value: number) {
 function StatsSkeleton() {
   return (
     <div className="mb-6">
-      <div className="flex items-center justify-between gap-3 mb-6">
+      <div className="flex items-center justify-between gap-3 mb-4">
         <div className="h-6 w-28 bg-zinc-800 rounded animate-pulse" />
         <div className="h-11 w-[140px] sm:w-[160px] bg-zinc-800 rounded-lg animate-pulse flex-shrink-0" />
       </div>
-      <div className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-5 md:p-6 animate-pulse">
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-3 flex-1 min-w-0">
-            <div className="h-3 w-44 bg-zinc-800 rounded" />
-            <div className="h-10 w-64 bg-zinc-800 rounded" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-5 animate-pulse">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-3 flex-1 min-w-0">
+              <div className="h-3 w-32 bg-zinc-800 rounded" />
+              <div className="h-8 w-40 bg-zinc-800 rounded" />
+            </div>
+            <div className="w-10 h-10 bg-zinc-800 rounded-xl flex-shrink-0" />
           </div>
-          <div className="w-11 h-11 bg-zinc-800 rounded-xl flex-shrink-0" />
+        </div>
+        <div className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-5 animate-pulse">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-3 flex-1 min-w-0">
+              <div className="h-3 w-32 bg-zinc-800 rounded" />
+              <div className="h-8 w-40 bg-zinc-800 rounded" />
+            </div>
+            <div className="w-10 h-10 bg-zinc-800 rounded-xl flex-shrink-0" />
+          </div>
         </div>
       </div>
     </div>
@@ -29,10 +41,15 @@ function StatsSkeleton() {
 
 export function DashboardStats() {
   const [isLoading, setIsLoading] = useState(true);
-  const [revenue, setRevenue] = useState(0);
+  const [monthlyRevenue, setMonthlyRevenue] = useState(0);
+  const [dailyRevenue, setDailyRevenue] = useState(0);
 
   // Período selecionado (padrão: mês atual)
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
+
+  // Data de hoje para faturamento diário
+  const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
+  const todayDisplay = useMemo(() => format(new Date(), "d 'de' MMMM", { locale: ptBR }), []);
 
   const { startDateStr, endDateStr, monthInputValue } = useMemo(() => {
     const start = startOfMonth(selectedDate);
@@ -50,33 +67,10 @@ export function DashboardStats() {
     const load = async () => {
       setIsLoading(true);
       try {
-        // 1) Buscar agendamentos do mês atual com status EXATAMENTE 'confirmed'
-        const { data: appts, error: apptError } = await supabase
-          .from('appointments')
-          .select('service_type')
-          .eq('status', 'confirmed')
-          .gte('appointment_date', startDateStr)
-          .lt('appointment_date', endDateStr);
-
-        if (apptError) throw apptError;
-
-        const appointments = appts ?? [];
-        if (appointments.length === 0) {
-          if (!isMounted) return;
-          setRevenue(0);
-          return;
-        }
-
-        // 2) "JOIN" com services via service_type (nome do serviço)
-        // OBS: como appointments não tem FK para services, fazemos o join no frontend por nome.
-        const serviceNames = Array.from(
-          new Set(appointments.map((a) => a.service_type).filter(Boolean))
-        );
-
+        // 1) Buscar todos os serviços primeiro para fazer o join
         const { data: services, error: servicesError } = await supabase
           .from('services')
-          .select('name, price')
-          .in('name', serviceNames);
+          .select('name, price');
 
         if (servicesError) throw servicesError;
 
@@ -86,18 +80,45 @@ export function DashboardStats() {
           priceByName.set(s.name, Number.isFinite(price) ? price : 0);
         });
 
-        const revenue = appointments.reduce((sum, a) => {
+        // 2) Buscar agendamentos do mês selecionado com status 'confirmed'
+        const { data: monthlyAppts, error: monthlyError } = await supabase
+          .from('appointments')
+          .select('service_type')
+          .eq('status', 'confirmed')
+          .gte('appointment_date', startDateStr)
+          .lt('appointment_date', endDateStr);
+
+        if (monthlyError) throw monthlyError;
+
+        const monthlyTotal = (monthlyAppts ?? []).reduce((sum, a) => {
+          if (!a.service_type) return sum;
+          const price = priceByName.get(a.service_type) ?? 0;
+          return sum + price;
+        }, 0);
+
+        // 3) Buscar agendamentos do dia atual com status 'confirmed'
+        const { data: dailyAppts, error: dailyError } = await supabase
+          .from('appointments')
+          .select('service_type')
+          .eq('status', 'confirmed')
+          .eq('appointment_date', todayStr);
+
+        if (dailyError) throw dailyError;
+
+        const dailyTotal = (dailyAppts ?? []).reduce((sum, a) => {
           if (!a.service_type) return sum;
           const price = priceByName.get(a.service_type) ?? 0;
           return sum + price;
         }, 0);
 
         if (!isMounted) return;
-        setRevenue(Number.isFinite(revenue) ? revenue : 0);
+        setMonthlyRevenue(Number.isFinite(monthlyTotal) ? monthlyTotal : 0);
+        setDailyRevenue(Number.isFinite(dailyTotal) ? dailyTotal : 0);
       } catch {
         // Falha silenciosa: dashboard não deve quebrar o /admin
         if (!isMounted) return;
-        setRevenue(0);
+        setMonthlyRevenue(0);
+        setDailyRevenue(0);
       } finally {
         if (!isMounted) return;
         setIsLoading(false);
@@ -108,14 +129,14 @@ export function DashboardStats() {
     return () => {
       isMounted = false;
     };
-  }, [startDateStr, endDateStr]);
+  }, [startDateStr, endDateStr, todayStr]);
 
   if (isLoading) return <StatsSkeleton />;
 
   return (
     <div className="mb-6">
       {/* Header com título e seletor */}
-      <div className="flex items-center justify-between gap-3 mb-6">
+      <div className="flex items-center justify-between gap-3 mb-4">
         <h2 className="text-lg md:text-2xl font-bold text-zinc-100 leading-tight">
           Financeiro
         </h2>
@@ -140,17 +161,35 @@ export function DashboardStats() {
         </label>
       </div>
 
-      {/* Hero metric - Faturamento Real */}
-      <div className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-5 md:p-6 hover:border-zinc-700 transition-colors">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            <p className="text-xs text-zinc-400 mb-2">Faturamento real (confirmados)</p>
-            <p className="text-3xl md:text-4xl font-bold text-foreground tracking-tight">
-              {formatBRL(revenue || 0)}
-            </p>
+      {/* Cards de faturamento */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Faturamento do Dia */}
+        <div className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 md:p-5 hover:border-zinc-700 transition-colors">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-zinc-400 mb-1">Hoje ({todayDisplay})</p>
+              <p className="text-2xl md:text-3xl font-bold text-emerald-400 tracking-tight">
+                {formatBRL(dailyRevenue || 0)}
+              </p>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-emerald-600/15 border border-emerald-600/25 flex items-center justify-center flex-shrink-0">
+              <CalendarDays className="w-5 h-5 text-emerald-500" />
+            </div>
           </div>
-          <div className="w-11 h-11 rounded-xl bg-green-600/15 border border-green-600/25 flex items-center justify-center flex-shrink-0">
-            <DollarSign className="w-5 h-5 text-green-500" />
+        </div>
+
+        {/* Faturamento Mensal */}
+        <div className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 md:p-5 hover:border-zinc-700 transition-colors">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-zinc-400 mb-1">Mês (confirmados)</p>
+              <p className="text-2xl md:text-3xl font-bold text-foreground tracking-tight">
+                {formatBRL(monthlyRevenue || 0)}
+              </p>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-green-600/15 border border-green-600/25 flex items-center justify-center flex-shrink-0">
+              <DollarSign className="w-5 h-5 text-green-500" />
+            </div>
           </div>
         </div>
       </div>

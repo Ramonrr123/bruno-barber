@@ -3,6 +3,26 @@
 const TELEGRAM_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = import.meta.env.VITE_TELEGRAM_CHAT_ID;
 
+/** Mensagem de lembrete usada no WhatsApp (mesma do Telegram) */
+const REMINDER_MESSAGE_TEMPLATE = (clientName: string, serviceName: string, date: string) =>
+  `Fala ${clientName}, tranquilo? Passando pra confirmar teu corte (${serviceName}) agendado para ${date}!`;
+
+/**
+ * Gera o link do WhatsApp para lembrete rápido: abre a conversa com o cliente
+ * com a mensagem de confirmação já preenchida (mesma do Telegram).
+ */
+export function getWhatsAppReminderLink(
+  phone: string,
+  clientName: string,
+  serviceName: string,
+  date: string // Ex: "20/01 às 14:30"
+): string {
+  let cleanPhone = phone.replace(/\D/g, '');
+  if (cleanPhone.length <= 11) cleanPhone = `55${cleanPhone}`;
+  const message = REMINDER_MESSAGE_TEMPLATE(clientName, serviceName, date);
+  return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+}
+
 interface NotificationProps {
   type: 'NEW_APPOINTMENT' | 'CANCELED';
   clientName: string;
@@ -28,12 +48,8 @@ export async function sendTelegramNotification({
   // Adiciona DDI 55 se não tiver (assumindo Brasil)
   if (cleanPhone.length <= 11) cleanPhone = `55${cleanPhone}`;
 
-  // 2. Mensagem Automática para o WhatsApp (URL Encoded)
-  const whatsappMessage = encodeURIComponent(
-    `Fala ${clientName}, tranquilo? Passando pra confirmar teu corte (${serviceName}) agendado para ${date}!`
-  );
-  
-  const whatsappLink = `https://wa.me/${cleanPhone}?text=${whatsappMessage}`;
+  // 2. Mensagem Automática para o WhatsApp (mesma do lembrete rápido)
+  const whatsappLink = getWhatsAppReminderLink(phone, clientName, serviceName, date);
 
   // 3. Montagem da Mensagem do Telegram
   // Usando HTML parse mode para evitar problemas com links longos

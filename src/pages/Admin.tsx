@@ -15,7 +15,7 @@ import {
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
-  UserX,
+  MessageCircle,
   Ban,
   Scissors
 } from 'lucide-react';
@@ -26,7 +26,7 @@ import { showConfirm as confirm } from '@/hooks/useConfirm';
 import { BlockTimeManager } from '@/components/admin/BlockTimeManager';
 import { ServicesManager } from '@/components/admin/ServicesManager';
 import { DashboardStats } from '@/components/admin/DashboardStats';
-import { sendTelegramNotification } from '@/lib/telegram';
+import { sendTelegramNotification, getWhatsAppReminderLink } from '@/lib/telegram';
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -260,24 +260,20 @@ export default function Admin() {
     }
   };
 
-  // Marcar como não compareceu
-  const handleNoShow = async (id: string) => {
-    const confirmed = await confirm('Marcar este agendamento como "Não Compareceu"?');
-    if (!confirmed) return;
-    
-    try {
-      const { error } = await supabase
-        .from('appointments')
-        .update({ status: 'no_show' })
-        .eq('id', id);
-
-      if (error) throw error;
-      notification.success('Marcado como não compareceu');
-      fetchAppointments();
-    } catch (error) {
-      console.error('Error marking no show:', error);
-      notification.error('Erro ao atualizar');
+  // Lembrete rápido: abre WhatsApp com o cliente e a mensagem de confirmação já preenchida
+  const handleQuickReminder = (apt: Appointment) => {
+    if (!apt.client_phone?.trim()) {
+      notification.error('Telefone do cliente não informado');
+      return;
     }
+    const dateFormatted = `${format(parseISO(apt.appointment_date), 'dd/MM', { locale: ptBR })} às ${apt.start_time.slice(0, 5)}`;
+    const link = getWhatsAppReminderLink(
+      apt.client_phone,
+      apt.client_name || 'Cliente',
+      apt.service_type,
+      dateFormatted
+    );
+    window.open(link, '_blank', 'noopener,noreferrer');
   };
 
   // Verificar se agendamento está atrasado
@@ -428,14 +424,33 @@ export default function Admin() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 pb-24">
-      <div className="max-w-2xl mx-auto">
+    <div className="min-h-screen bg-background p-4 pb-24 relative">
+      {/* Logo do sapo no fundo - discreto para não competir com o conteúdo (UX) */}
+      <div
+        className="fixed inset-0 z-0 flex items-center justify-center pointer-events-none"
+        aria-hidden
+      >
+        <div
+          className="w-[min(70vw,320px)] h-[min(70vw,320px)] max-w-[320px] max-h-[320px] rounded-full"
+          style={{
+            backgroundImage: `url(${import.meta.env.BASE_URL}logo.png)`,
+            backgroundSize: 'contain',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            opacity: 0.38,
+            filter: 'blur(3px)',
+            transform: 'scale(2.2)',
+          }}
+        />
+      </div>
+
+      <div className="max-w-2xl mx-auto relative z-10">
         {/* Header Mobile-First */}
         <div className="mb-6 space-y-3">
           {/* Barra Superior - Logo e Sair */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-2xl">🐸</span>
+              <span className="text-sm sm:text-base">🐸</span>
               <h1 className="text-lg sm:text-xl font-bold text-foreground">Agenda</h1>
             </div>
             <button
@@ -605,15 +620,15 @@ export default function Admin() {
                                 </span>
                               </div>
                               
-                              {/* Botões de correção - mantém "Não Veio" e "Cancelar" */}
+                              {/* Botões de correção - Lembrete rápido e Cancelar */}
                               <div className="flex gap-2">
                                 <button
-                                  onClick={() => handleNoShow(apt.id)}
-                                  className="flex-1 bg-gray-500/10 text-gray-400 py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-500/20 transition-colors font-medium text-sm"
-                                  title="Marcar como não compareceu (correção)"
+                                  onClick={() => handleQuickReminder(apt)}
+                                  className="flex-1 bg-primary/20 text-primary py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-primary/30 transition-colors font-medium text-sm"
+                                  title="Abrir WhatsApp com lembrete já preenchido"
                                 >
-                                  <UserX className="w-4 h-4" />
-                                  Não Veio
+                                  <MessageCircle className="w-4 h-4" />
+                                  Lembrete rápido
                                 </button>
                                 <button
                                   onClick={() => handleCancel(apt.id)}
@@ -637,12 +652,12 @@ export default function Admin() {
                                 Concluir
                               </button>
                               <button
-                                onClick={() => handleNoShow(apt.id)}
-                                className="bg-gray-500/10 text-gray-400 py-2 px-4 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-500/20 transition-colors font-medium text-sm"
-                                title="Marcar como não compareceu"
+                                onClick={() => handleQuickReminder(apt)}
+                                className="bg-primary/20 text-primary py-2 px-4 rounded-lg flex items-center justify-center gap-2 hover:bg-primary/30 transition-colors font-medium text-sm"
+                                title="Abrir WhatsApp com lembrete já preenchido"
                               >
-                                <UserX className="w-4 h-4" />
-                                Não Veio
+                                <MessageCircle className="w-4 h-4" />
+                                Lembrete rápido
                               </button>
                               <button
                                 onClick={() => handleCancel(apt.id)}
