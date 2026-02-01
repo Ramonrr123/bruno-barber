@@ -20,8 +20,8 @@ export function getWhatsAppReminderLink(
   let cleanPhone = phone.replace(/\D/g, '');
   if (cleanPhone.length <= 11) cleanPhone = `55${cleanPhone}`;
   const message = REMINDER_MESSAGE_TEMPLATE(clientName, serviceName, date);
-  // api.whatsapp.com tende a funcionar melhor com WhatsApp Business em alguns dispositivos
-  return `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(message)}`;
+  // wa.me funciona melhor com WhatsApp e WhatsApp Business em todos os dispositivos
+  return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
 }
 
 interface NotificationProps {
