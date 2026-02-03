@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { format, addDays, subDays, isToday, parseISO } from 'date-fns';
+import { format, addDays, subDays, isToday, parseISO, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
   Clock, 
@@ -17,7 +17,10 @@ import {
   ChevronRight,
   MessageCircle,
   Ban,
-  Scissors
+  Scissors,
+  Calendar,
+  Lock,
+  Pencil
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Appointment, Service } from '@/types/booking';
@@ -25,7 +28,7 @@ import { notification } from '@/hooks/useNotification';
 import { showConfirm as confirm } from '@/hooks/useConfirm';
 import { BlockTimeManager } from '@/components/admin/BlockTimeManager';
 import { ServicesManager } from '@/components/admin/ServicesManager';
-import { DashboardStats } from '@/components/admin/DashboardStats';
+import { AdminSummaryCards } from '@/components/admin/AdminSummaryCards';
 import { sendTelegramNotification, getWhatsAppReminderLink } from '@/lib/telegram';
 
 export default function Admin() {
@@ -47,6 +50,18 @@ export default function Admin() {
   const [showBlockTimeManager, setShowBlockTimeManager] = useState(false);
   const [showServicesManager, setShowServicesManager] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
+  const [userDisplayName, setUserDisplayName] = useState('');
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
+  const [editForm, setEditForm] = useState({
+    clientName: '',
+    clientPhone: '',
+    serviceType: '',
+    appointmentDate: '',
+    startTime: '09:00',
+    duration: 30,
+  });
+  const [editConflictWarning, setEditConflictWarning] = useState<string | null>(null);
 
   // Verificar autenticação
   useEffect(() => {
@@ -57,6 +72,10 @@ export default function Admin() {
           navigate('/login', { replace: true });
           return;
         }
+        const name =
+          (session.user?.user_metadata?.full_name as string) ||
+          (session.user?.email?.split('@')[0] ?? '');
+        setUserDisplayName(name || '');
         setCheckingAuth(false);
       } catch (error) {
         console.error('Error checking auth:', error);
@@ -350,6 +369,110 @@ export default function Admin() {
     }
   };
 
+  // Verificar conflitos ao editar (exclui o próprio agendamento)
+  const checkEditConflict = async (
+    date: string,
+    startTime: string,
+    duration: number,
+    excludeAppointmentId: string
+  ) => {
+    try {
+      const [hours, mins] = startTime.split(':').map(Number);
+      const totalMinutes = hours * 60 + mins + duration;
+      const endHours = Math.floor(totalMinutes / 60);
+      const endMins = totalMinutes % 60;
+      const endTime = `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`;
+
+      const { data, error } = await supabase
+        .from('appointments')
+        .select('*')
+        .eq('appointment_date', date)
+        .in('status', ['scheduled', 'confirmed', 'blocked']);
+
+      if (error) throw error;
+
+      const conflicts = (data as Appointment[]).filter(apt => {
+        if (apt.id === excludeAppointmentId) return false;
+        const aptStart = apt.start_time;
+        const aptEnd = apt.end_time;
+        return (
+          (startTime >= aptStart && startTime < aptEnd) ||
+          (endTime > aptStart && endTime <= aptEnd) ||
+          (startTime <= aptStart && endTime >= aptEnd)
+        );
+      });
+
+      if (conflicts.length > 0) {
+        const conflictNames = conflicts.map(c =>
+          `${c.start_time.slice(0, 5)} - ${c.client_name || 'Bloqueado'}`
+        ).join(', ');
+        setEditConflictWarning(`⚠️ Conflito: ${conflictNames}. Você pode prosseguir mesmo assim.`);
+        return true;
+      } else {
+        setEditConflictWarning(null);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error checking edit conflict:', error);
+      return false;
+    }
+  };
+
+  const handleOpenEdit = (apt: Appointment) => {
+    const service = services.find(s => s.name === apt.service_type);
+    const duration = service?.duration ?? 30;
+    setEditingAppointment(apt);
+    setEditForm({
+      clientName: apt.client_name ?? '',
+      clientPhone: apt.client_phone ?? '',
+      serviceType: apt.service_type ?? '',
+      appointmentDate: apt.appointment_date ?? '',
+      startTime: apt.start_time?.slice(0, 5) ?? '09:00',
+      duration,
+    });
+    setEditConflictWarning(null);
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingAppointment) return;
+    if (!editForm.clientName?.trim() || !editForm.clientPhone?.trim() || !editForm.serviceType) {
+      notification.error('Preencha nome, telefone e serviço');
+      return;
+    }
+
+    try {
+      const [hours, mins] = editForm.startTime.split(':').map(Number);
+      const totalMinutes = hours * 60 + mins + editForm.duration;
+      const endHours = Math.floor(totalMinutes / 60);
+      const endMins = totalMinutes % 60;
+      const endTime = `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`;
+
+      const { error } = await supabase
+        .from('appointments')
+        .update({
+          client_name: editForm.clientName.trim(),
+          client_phone: editForm.clientPhone.trim(),
+          service_type: editForm.serviceType,
+          appointment_date: editForm.appointmentDate,
+          start_time: editForm.startTime,
+          end_time: endTime,
+        })
+        .eq('id', editingAppointment.id);
+
+      if (error) throw error;
+
+      notification.success('Agendamento atualizado');
+      setShowEditModal(false);
+      setEditingAppointment(null);
+      setEditConflictWarning(null);
+      fetchAppointments();
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Erro ao atualizar';
+      notification.error(message);
+    }
+  };
+
   // Salvar encaixe manual
   const handleManualBooking = async () => {
     if (!manualBooking.clientName || !manualBooking.clientPhone || !manualBooking.serviceType) {
@@ -396,13 +519,32 @@ export default function Admin() {
     }
   };
 
-  // Verificar conflito quando mudar horário/data
+  // Verificar conflito quando mudar horário/data (encaixe manual)
   useEffect(() => {
     if (showManualBookingModal && manualBooking.appointmentDate && manualBooking.startTime && manualBooking.duration) {
       checkTimeConflict(manualBooking.appointmentDate, manualBooking.startTime, manualBooking.duration);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [manualBooking.appointmentDate, manualBooking.startTime, manualBooking.duration, showManualBookingModal]);
+
+  // Verificar conflito ao editar agendamento
+  useEffect(() => {
+    if (
+      showEditModal &&
+      editingAppointment &&
+      editForm.appointmentDate &&
+      editForm.startTime &&
+      editForm.duration
+    ) {
+      checkEditConflict(
+        editForm.appointmentDate,
+        editForm.startTime,
+        editForm.duration,
+        editingAppointment.id
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showEditModal, editingAppointment?.id, editForm.appointmentDate, editForm.startTime, editForm.duration]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -445,105 +587,140 @@ export default function Admin() {
       </div>
 
       <div className="max-w-2xl mx-auto relative z-10">
-        {/* Header Mobile-First */}
-        <div className="mb-6 space-y-3">
-          {/* Barra Superior - Logo e Sair */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-sm sm:text-base">🐸</span>
-              <h1 className="text-lg sm:text-xl font-bold text-foreground">Agenda</h1>
-            </div>
+        {/* Header - Saudação e ações */}
+        <div className="mb-5 flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground">
+              Olá, Danilo
+            </h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Você está em sua agenda.</p>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={() => setShowServicesManager(true)}
+              className="p-3 rounded-lg bg-muted/80 hover:bg-muted border border-border transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+              aria-label="Serviços"
+              title="Serviços"
+            >
+              <Scissors className="w-6 h-6 text-foreground" />
+            </button>
+            <button
+              onClick={() => setShowBlockTimeManager(true)}
+              className="p-3 rounded-lg bg-muted/80 hover:bg-muted border border-border transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+              aria-label="Bloquear horários"
+              title="Bloquear horários"
+            >
+              <Lock className="w-6 h-6 text-foreground" />
+            </button>
+            <button
+              onClick={() => {
+                setManualBooking({
+                  ...manualBooking,
+                  appointmentDate: format(selectedDate, 'yyyy-MM-dd'),
+                });
+                setShowManualBookingModal(true);
+              }}
+              className="p-3 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity min-w-[44px] min-h-[44px] flex items-center justify-center"
+              aria-label="Novo agendamento"
+              title="Novo agendamento"
+            >
+              <Plus className="w-6 h-6" />
+            </button>
             <button
               onClick={handleLogout}
-              className="flex items-center justify-center w-10 h-10 sm:w-auto sm:h-auto sm:px-3 sm:py-2 bg-secondary/50 text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors sm:gap-2 border border-border"
+              className="p-3 rounded-lg bg-muted/80 hover:bg-muted border border-border transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
               aria-label="Sair"
               title="Sair"
             >
-              <LogOut className="w-5 h-5" />
-              <span className="hidden sm:inline text-sm font-medium">Sair</span>
-            </button>
-          </div>
-          
-          {/* Grid de Configurações - Mobile-First */}
-          <div className="grid grid-cols-2 gap-2 sm:gap-3">
-            {/* Botão de Serviços */}
-            <button
-              onClick={() => setShowServicesManager(true)}
-              className="flex flex-col items-center justify-center gap-1.5 sm:flex-row sm:gap-2 px-3 py-3 sm:py-2.5 bg-primary/10 text-primary border border-primary/20 rounded-xl hover:bg-primary/20 active:scale-95 transition-all font-medium text-xs sm:text-sm min-h-[64px] sm:min-h-0"
-              aria-label="Gerenciar Serviços"
-              title="Gerenciar serviços oferecidos"
-            >
-              <Scissors className="w-5 h-5 sm:w-4 sm:h-4 flex-shrink-0" />
-              <span className="text-center">Serviços</span>
-            </button>
-            
-            {/* Botão de Bloqueios de Horário - Destaque */}
-            <button
-              onClick={() => setShowBlockTimeManager(true)}
-              className="flex flex-col items-center justify-center gap-1.5 sm:flex-row sm:gap-2 px-3 py-3 sm:py-2.5 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 active:scale-95 transition-all font-medium text-xs sm:text-sm shadow-md shadow-primary/20 min-h-[64px] sm:min-h-0"
-              aria-label="Bloqueios de Horário"
-              title="Bloquear horários ou dias inteiros"
-            >
-              <Ban className="w-5 h-5 sm:w-4 sm:h-4 flex-shrink-0" />
-              <span className="text-center">Bloquear</span>
+              <LogOut className="w-6 h-6 text-foreground" />
             </button>
           </div>
         </div>
 
-        {/* Dashboard Financeiro (Mês Atual) */}
-        <DashboardStats />
-
-        {/* Navegação de Datas */}
-        <div className="flex items-center justify-between glass-card rounded-xl p-4 mb-6">
-          <button 
-            onClick={() => setSelectedDate(subDays(selectedDate, 1))}
-            className="p-2 hover:bg-muted rounded-lg transition-colors"
-            aria-label="Dia anterior"
+        {/* Seletor de semana - faixa de datas + setas */}
+        <div className="glass-card rounded-xl p-3 mb-3 flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => setSelectedDate((d) => subWeeks(d, 1))}
+            className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-muted rounded-lg transition-colors"
+            aria-label="Semana anterior"
           >
-            <ChevronLeft className="w-5 h-5" />
+            <ChevronLeft className="w-6 h-6 text-muted-foreground" />
           </button>
-          
-          <div className="text-center flex-1">
-            <button
-              onClick={() => setSelectedDate(new Date())}
-              className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                isToday(selectedDate) 
-                  ? 'bg-primary text-primary-foreground' 
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-              }`}
-            >
-              {isToday(selectedDate) ? 'Hoje' : 'Ir para Hoje'}
-            </button>
-            <p className="text-lg font-semibold text-foreground capitalize mt-2">
-              {format(selectedDate, "EEEE", { locale: ptBR })}
-            </p>
-            <p className="text-muted-foreground">
-              {format(selectedDate, "d 'de' MMMM", { locale: ptBR })}
-            </p>
+          <div className="flex items-center gap-2 min-w-0 flex-1 justify-center">
+            <Calendar className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+            <span className="text-sm font-medium text-foreground truncate">
+              {format(startOfWeek(selectedDate, { weekStartsOn: 1 }), 'd MMM yyyy', { locale: ptBR })} à{' '}
+              {format(endOfWeek(selectedDate, { weekStartsOn: 1 }), 'd MMM yyyy', { locale: ptBR })}
+            </span>
           </div>
-          
-          <button 
-            onClick={() => setSelectedDate(addDays(selectedDate, 1))}
-            className="p-2 hover:bg-muted rounded-lg transition-colors"
-            aria-label="Próximo dia"
+          <button
+            type="button"
+            onClick={() => setSelectedDate((d) => addWeeks(d, 1))}
+            className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-muted rounded-lg transition-colors"
+            aria-label="Próxima semana"
           >
-            <ChevronRight className="w-5 h-5" />
+            <ChevronRight className="w-6 h-6 text-muted-foreground" />
           </button>
         </div>
 
-        {/* Appointments List */}
-        <div className="space-y-3">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-6 h-6 animate-spin text-primary" />
-            </div>
-          ) : appointments.length === 0 ? (
-            <div className="text-center py-12 glass-card rounded-xl">
-              <p className="text-muted-foreground">Nenhum agendamento para esta data</p>
-            </div>
-          ) : (
+        {/* Cartões dos dias da semana - clicáveis */}
+        <div className="flex gap-1.5 mb-5 overflow-x-auto pb-1">
+          {(() => {
+            const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
+            return Array.from({ length: 7 }, (_, i) => {
+              const d = addDays(weekStart, i);
+              const dayStr = format(d, 'EEE', { locale: ptBR }).toUpperCase().slice(0, 3);
+              const dayNum = format(d, 'd');
+              const isSelected =
+                format(d, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
+              return (
+                <button
+                  key={d.getTime()}
+                  type="button"
+                  onClick={() => setSelectedDate(d)}
+                  className={`flex flex-col items-center justify-center min-w-[48px] py-2.5 px-2 rounded-xl border transition-all flex-shrink-0 ${
+                    isSelected
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'glass-card border-border hover:border-primary/40 text-foreground'
+                  }`}
+                >
+                  <span className="text-xs font-medium opacity-90">{dayStr}</span>
+                  <span className="text-base font-bold mt-0.5">{dayNum}</span>
+                </button>
+              );
+            });
+          })()}
+        </div>
+
+        {/* Resumo Hoje + Esta semana */}
+        <AdminSummaryCards weekAnchor={selectedDate} />
+
+        {/* Agenda do dia - oculta agendamentos já concluídos automaticamente (passou o horário de término) */}
+        {(() => {
+          const appointmentsToShow = appointments.filter((apt) => !isAppointmentAutoCompleted(apt));
+          return (
+        <div className="glass-card rounded-xl border border-border overflow-hidden mb-8">
+          <div className="p-3 border-b border-border flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-foreground">
+              {format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR })}
+            </h2>
+          </div>
+          <div
+            className={`min-h-[200px] ${appointmentsToShow.length === 0 && !isLoading ? 'bg-[repeating-linear-gradient(-45deg,transparent,transparent_8px,hsl(var(--muted)/0.15)_8px,hsl(var(--muted)/0.15)_16px)]' : ''}`}
+          >
+            <div className="p-3 space-y-3">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                </div>
+              ) : appointmentsToShow.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">Nenhum agendamento para esta data</p>
+                </div>
+              ) : (
             <AnimatePresence>
-              {appointments.map((apt, index) => {
+              {appointmentsToShow.map((apt, index) => {
                 const isOverdue = isAppointmentOverdue(apt);
                 return (
                 <motion.div
@@ -586,7 +763,7 @@ export default function Admin() {
                       </div>
                     </div>
                     
-                    <div className="flex flex-col items-end gap-1">
+                    <div className="flex flex-col items-end gap-1.5">
                       {isOverdue && (
                         <span className="px-2 py-1 text-xs rounded-full border border-yellow-500/50 bg-yellow-500/20 text-yellow-400">
                           Atrasado / Pendente
@@ -600,101 +777,53 @@ export default function Admin() {
                         {apt.status === 'cancelled' && 'Cancelado pelo Cliente'}
                         {apt.status === 'no_show' && 'Não Compareceu'}
                       </span>
+                      {(apt.status === 'scheduled' || apt.status === 'confirmed') && (
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                          <button
+                            onClick={() => handleOpenEdit(apt)}
+                            className="p-2.5 rounded-md bg-muted text-foreground hover:bg-muted/80 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                            title="Editar agendamento"
+                            aria-label="Editar agendamento"
+                          >
+                            <Pencil className="w-6 h-6" />
+                          </button>
+                          <button
+                            onClick={() => handleComplete(apt.id)}
+                            className="p-2.5 rounded-md bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                            title="Concluir"
+                            aria-label="Concluir"
+                          >
+                            <Check className="w-6 h-6" />
+                          </button>
+                          <button
+                            onClick={() => handleQuickReminder(apt)}
+                            className="p-2.5 rounded-md bg-primary/20 text-primary hover:bg-primary/30 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                            title="Lembrete rápido"
+                            aria-label="Lembrete rápido"
+                          >
+                            <MessageCircle className="w-6 h-6" />
+                          </button>
+                          <button
+                            onClick={() => handleCancel(apt.id)}
+                            className="p-2.5 rounded-md bg-destructive/20 text-destructive hover:bg-destructive/30 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                            title="Cancelar"
+                            aria-label="Cancelar"
+                          >
+                            <X className="w-6 h-6" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
-
-                  {(apt.status === 'scheduled' || apt.status === 'confirmed') && (
-                    <div className="pt-3 border-t border-border">
-                      {(() => {
-                        const isAutoCompleted = isAppointmentAutoCompleted(apt);
-                        
-                        if (isAutoCompleted) {
-                          // Agendamento passado - Auto-concluído visualmente
-                          return (
-                            <div className="space-y-2">
-                              {/* Badge de Auto-Conclusão */}
-                              <div className="flex items-center justify-center gap-2 py-2">
-                                <span className="px-3 py-1.5 text-sm rounded-full border border-emerald-500/50 bg-emerald-500/20 text-emerald-400 font-medium flex items-center gap-2">
-                                  <Check className="w-4 h-4" />
-                                  Concluído (Auto)
-                                </span>
-                              </div>
-                              
-                              {/* Botões de correção - Lembrete rápido e Cancelar */}
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={() => handleQuickReminder(apt)}
-                                  className="flex-1 bg-primary/20 text-primary py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-primary/30 transition-colors font-medium text-sm"
-                                  title="Abrir WhatsApp com lembrete já preenchido"
-                                >
-                                  <MessageCircle className="w-4 h-4" />
-                                  Lembrete rápido
-                                </button>
-                                <button
-                                  onClick={() => handleCancel(apt.id)}
-                                  className="flex-1 bg-destructive/20 text-destructive py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-destructive/30 transition-colors font-medium text-sm"
-                                >
-                                  <X className="w-4 h-4" />
-                                  Cancelar
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        } else {
-                          // Agendamento futuro - Botões normais
-                          return (
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleComplete(apt.id)}
-                                className="flex-1 bg-emerald-500/20 text-emerald-400 py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-emerald-500/30 transition-colors font-medium"
-                              >
-                                <Check className="w-4 h-4" />
-                                Concluir
-                              </button>
-                              <button
-                                onClick={() => handleQuickReminder(apt)}
-                                className="bg-primary/20 text-primary py-2 px-4 rounded-lg flex items-center justify-center gap-2 hover:bg-primary/30 transition-colors font-medium text-sm"
-                                title="Abrir WhatsApp com lembrete já preenchido"
-                              >
-                                <MessageCircle className="w-4 h-4" />
-                                Lembrete rápido
-                              </button>
-                              <button
-                                onClick={() => handleCancel(apt.id)}
-                                className="flex-1 bg-destructive/20 text-destructive py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-destructive/30 transition-colors font-medium"
-                              >
-                                <X className="w-4 h-4" />
-                                Cancelar
-                              </button>
-                            </div>
-                          );
-                        }
-                      })()}
-                    </div>
-                  )}
                 </motion.div>
               )})}
             </AnimatePresence>
-          )}
+              )}
+            </div>
+          </div>
         </div>
-
-        {/* FAB Button - Encaixe Manual */}
-        <motion.button
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => {
-            setManualBooking({
-              ...manualBooking,
-              appointmentDate: format(selectedDate, 'yyyy-MM-dd'),
-            });
-            setShowManualBookingModal(true);
-          }}
-          className="fixed bottom-6 right-6 w-16 h-16 bg-primary text-primary-foreground rounded-full shadow-lg neon-glow flex items-center justify-center z-40 hover:opacity-90 transition-opacity"
-        >
-          <Plus className="w-8 h-8" />
-        </motion.button>
+          );
+        })()}
 
         {/* Modal Encaixe Manual */}
         <AnimatePresence>
@@ -820,6 +949,139 @@ export default function Admin() {
                     className="flex-1 bg-primary text-primary-foreground py-4 rounded-xl font-semibold text-base hover:opacity-90 transition-opacity"
                   >
                     Salvar Encaixe
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Modal Editar Agendamento */}
+        <AnimatePresence>
+          {showEditModal && editingAppointment && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50"
+              onClick={() => {
+                setShowEditModal(false);
+                setEditingAppointment(null);
+                setEditConflictWarning(null);
+              }}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-card rounded-xl p-6 w-full max-w-md border border-border"
+              >
+                <h2 className="text-2xl font-bold text-foreground mb-6 text-center">
+                  Editar Agendamento
+                </h2>
+
+                {editConflictWarning && (
+                  <div className="mb-4 p-3 bg-yellow-500/20 border border-yellow-500/50 rounded-lg flex items-start gap-2">
+                    <AlertTriangle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-yellow-400">{editConflictWarning}</p>
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-base font-medium text-foreground mb-2">
+                      Nome do Cliente
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.clientName}
+                      onChange={(e) => setEditForm({ ...editForm, clientName: e.target.value })}
+                      className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                      placeholder="Nome completo"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-base font-medium text-foreground mb-2">
+                      Telefone
+                    </label>
+                    <input
+                      type="tel"
+                      value={editForm.clientPhone}
+                      onChange={(e) => setEditForm({ ...editForm, clientPhone: e.target.value })}
+                      className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                      placeholder="(00) 00000-0000"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-base font-medium text-foreground mb-2">
+                      Serviço
+                    </label>
+                    <select
+                      value={editForm.serviceType}
+                      onChange={(e) => {
+                        const service = services.find(s => s.name === e.target.value);
+                        setEditForm({
+                          ...editForm,
+                          serviceType: e.target.value,
+                          duration: service?.duration ?? 30,
+                        });
+                      }}
+                      className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                      <option value="">Selecione um serviço</option>
+                      {services.map((service) => (
+                        <option key={service.id} value={service.name}>
+                          {service.name} ({service.duration} min)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-base font-medium text-foreground mb-2">
+                      Data
+                    </label>
+                    <input
+                      type="date"
+                      value={editForm.appointmentDate}
+                      onChange={(e) => setEditForm({ ...editForm, appointmentDate: e.target.value })}
+                      min={format(new Date(), 'yyyy-MM-dd')}
+                      className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-base font-medium text-foreground mb-2">
+                      Horário
+                    </label>
+                    <input
+                      type="time"
+                      value={editForm.startTime}
+                      onChange={(e) => setEditForm({ ...editForm, startTime: e.target.value })}
+                      className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 mt-6">
+                  <button
+                    onClick={() => {
+                      setShowEditModal(false);
+                      setEditingAppointment(null);
+                      setEditConflictWarning(null);
+                    }}
+                    className="flex-1 bg-secondary text-secondary-foreground py-4 rounded-xl font-semibold text-base hover:bg-secondary/80 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleSaveEdit}
+                    className="flex-1 bg-primary text-primary-foreground py-4 rounded-xl font-semibold text-base hover:opacity-90 transition-opacity"
+                  >
+                    Salvar alterações
                   </button>
                 </div>
               </motion.div>

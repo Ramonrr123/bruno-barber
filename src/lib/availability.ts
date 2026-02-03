@@ -13,12 +13,16 @@ import { format } from 'date-fns';
 export const DEFAULT_OPEN_DAYS = [1, 2, 3, 4, 5, 6]; // Segunda a Sexta e Sábado (Domingo = 0 está fechado)
 
 // Horários padrão para dias da semana
-// Segunda a Sexta: 09:30 - 19:30
+// Segunda, Terça, Quarta: 09:30 - 19:30
+// Quinta: 09:30 - 19:00
+// Sexta: 09:30 - 18:30
 // Sábado: 08:30 - 20:00
 export const WEEKDAY_START_TIME = '09:30'; // Segunda a Sexta
-export const WEEKDAY_END_TIME = '19:30';   // Segunda a Sexta
+export const WEEKDAY_END_TIME = '19:30';   // Segunda, Terça, Quarta
+export const THURSDAY_END_TIME = '19:00';  // Quinta
+export const FRIDAY_END_TIME = '18:30';    // Sexta
 export const SATURDAY_START_TIME = '08:30'; // Sábado
-export const SATURDAY_END_TIME = '20:00';   // Sábado
+export const SATURDAY_END_TIME = '19:30';   // Sábado
 
 // Horário de almoço
 // Segunda a Quinta: 12:00 - 13:30
@@ -30,10 +34,14 @@ export const LUNCH_END_TIME_WEEKEND = '13:00';   // Sexta e Sábado
 // Função auxiliar para obter horários baseados no dia da semana
 export function getDaySchedule(dayOfWeek: number): { startTime: string; endTime: string } | null {
   if (dayOfWeek >= 1 && dayOfWeek <= 5) {
-    // Segunda a Sexta
+    // Segunda a Sexta - horário de fim varia por dia
+    const endTime =
+      dayOfWeek === 4 ? THURSDAY_END_TIME :  // Quinta: até 19:00
+      dayOfWeek === 5 ? FRIDAY_END_TIME :   // Sexta: até 18:30
+      WEEKDAY_END_TIME;                      // Segunda, Terça, Quarta: até 19:30
     return {
       startTime: WEEKDAY_START_TIME,
-      endTime: WEEKDAY_END_TIME,
+      endTime,
     };
   } else if (dayOfWeek === 6) {
     // Sábado

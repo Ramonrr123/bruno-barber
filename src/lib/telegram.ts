@@ -10,6 +10,8 @@ const REMINDER_MESSAGE_TEMPLATE = (clientName: string, serviceName: string, date
 /**
  * Gera o link do WhatsApp para lembrete rápido: abre a conversa com o cliente
  * com a mensagem de confirmação já preenchida (mesma do Telegram).
+ * wa.me é o link universal: funciona no WhatsApp e no WhatsApp Business;
+ * o celular abre o app que o usuário tiver (ou o padrão para links do WhatsApp).
  */
 export function getWhatsAppReminderLink(
   phone: string,
@@ -20,7 +22,6 @@ export function getWhatsAppReminderLink(
   let cleanPhone = phone.replace(/\D/g, '');
   if (cleanPhone.length <= 11) cleanPhone = `55${cleanPhone}`;
   const message = REMINDER_MESSAGE_TEMPLATE(clientName, serviceName, date);
-  // wa.me funciona melhor com WhatsApp e WhatsApp Business em todos os dispositivos
   return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
 }
 
