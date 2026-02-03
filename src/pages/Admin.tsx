@@ -556,6 +556,46 @@ export default function Admin() {
     }
   };
 
+  // Função para obter a hora cheia de um horário (ex: "09:30" -> "09:00")
+  const getHourSlot = (startTime: string): string => {
+    const [hours] = startTime.split(':').map(Number);
+    return `${hours.toString().padStart(2, '0')}:00`;
+  };
+
+  // Função para formatar o label do horário (ex: "09:00" -> "09h")
+  const formatHourLabel = (hourSlot: string): string => {
+    const [hours] = hourSlot.split(':').map(Number);
+    return `${hours}h`;
+  };
+
+  // Função para agrupar agendamentos por horário
+  const groupAppointmentsByHour = (appointments: Appointment[]) => {
+    const grouped: Record<string, Appointment[]> = {};
+
+    appointments.forEach((apt) => {
+      const hourSlot = getHourSlot(apt.start_time);
+      if (!grouped[hourSlot]) {
+        grouped[hourSlot] = [];
+      }
+      grouped[hourSlot].push(apt);
+    });
+
+    // Ordenar agendamentos dentro de cada horário por horário de início
+    Object.keys(grouped).forEach((hourSlot) => {
+      grouped[hourSlot].sort((a, b) => 
+        a.start_time.localeCompare(b.start_time)
+      );
+    });
+
+    // Retornar ordenado por horário
+    return Object.keys(grouped)
+      .sort((a, b) => a.localeCompare(b))
+      .reduce((acc, hourSlot) => {
+        acc[hourSlot] = grouped[hourSlot];
+        return acc;
+      }, {} as Record<string, Appointment[]>);
+  };
+
 
   if (checkingAuth) {
     return (
@@ -699,6 +739,10 @@ export default function Admin() {
         {/* Agenda do dia - oculta agendamentos já concluídos automaticamente (passou o horário de término) */}
         {(() => {
           const appointmentsToShow = appointments.filter((apt) => !isAppointmentAutoCompleted(apt));
+          const groupedByHour = groupAppointmentsByHour(appointmentsToShow);
+          const hourSlots = Object.keys(groupedByHour);
+          const hasAnyAppointments = appointmentsToShow.length > 0;
+          
           return (
         <div className="glass-card rounded-xl border border-border overflow-hidden mb-8">
           <div className="p-3 border-b border-border flex items-center justify-between">
@@ -707,119 +751,145 @@ export default function Admin() {
             </h2>
           </div>
           <div
-            className={`min-h-[200px] ${appointmentsToShow.length === 0 && !isLoading ? 'bg-[repeating-linear-gradient(-45deg,transparent,transparent_8px,hsl(var(--muted)/0.15)_8px,hsl(var(--muted)/0.15)_16px)]' : ''}`}
+            className={`min-h-[200px] ${!hasAnyAppointments && !isLoading ? 'bg-[repeating-linear-gradient(-45deg,transparent,transparent_8px,hsl(var(--muted)/0.15)_8px,hsl(var(--muted)/0.15)_16px)]' : ''}`}
           >
-            <div className="p-3 space-y-3">
-              {isLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                </div>
-              ) : appointmentsToShow.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground">Nenhum agendamento para esta data</p>
-                </div>
-              ) : (
-            <AnimatePresence>
-              {appointmentsToShow.map((apt, index) => {
-                const isOverdue = isAppointmentOverdue(apt);
-                return (
-                <motion.div
-                  key={apt.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ delay: index * 0.05 }}
-                  className={`glass-card rounded-xl p-4 border ${
-                    isOverdue 
-                      ? 'border-yellow-500/50 bg-yellow-500/5' 
-                      : 'border-border'
-                  }`}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex flex-col items-center text-primary font-bold">
-                        <Clock className="w-4 h-4 mb-1" />
-                        <span className="text-sm">{apt.start_time.slice(0, 5)}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {apt.end_time.slice(0, 5)}
-                        </span>
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-foreground text-base">
-                          {apt.service_type}
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              </div>
+            ) : !hasAnyAppointments ? (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground">Nenhum agendamento para esta data</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-border/50">
+                {hourSlots.map((hourSlot) => {
+                  const hourAppointments = groupedByHour[hourSlot];
+                  if (hourAppointments.length === 0) return null;
+                  
+                  const hourLabel = formatHourLabel(hourSlot);
+                  
+                  return (
+                    <div key={hourSlot} className="p-3">
+                      {/* Cabeçalho do horário */}
+                      <div className="flex items-center gap-2 mb-3 px-2">
+                        <Clock className="w-4 h-4 text-primary flex-shrink-0" />
+                        <h3 className="text-sm font-semibold text-foreground">
+                          {hourLabel}
                         </h3>
-                        {apt.status !== 'blocked' && (
-                          <>
-                            <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
-                              <User className="w-3 h-3" />
-                              {apt.client_name}
-                            </div>
-                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                              <Phone className="w-3 h-3" />
-                              <span>{apt.client_phone}</span>
-                            </div>
-                          </>
-                        )}
+                        <span className="text-xs text-muted-foreground ml-auto">
+                          {hourAppointments.length} {hourAppointments.length === 1 ? 'agendamento' : 'agendamentos'}
+                        </span>
+                      </div>
+                      
+                      {/* Lista de agendamentos do horário */}
+                      <div className="space-y-2.5">
+                        <AnimatePresence>
+                          {hourAppointments.map((apt, index) => {
+                            const isOverdue = isAppointmentOverdue(apt);
+                            return (
+                              <motion.div
+                                key={apt.id}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, x: -20 }}
+                                transition={{ delay: index * 0.03 }}
+                                className={`glass-card rounded-xl p-4 border ${
+                                  isOverdue 
+                                    ? 'border-yellow-500/50 bg-yellow-500/5' 
+                                    : 'border-border'
+                                }`}
+                              >
+                                <div className="flex items-start justify-between mb-3">
+                                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <div className="flex flex-col items-center text-primary font-bold flex-shrink-0">
+                                      <Clock className="w-4 h-4 mb-1" />
+                                      <span className="text-sm">{apt.start_time.slice(0, 5)}</span>
+                                      <span className="text-xs text-muted-foreground">
+                                        {apt.end_time.slice(0, 5)}
+                                      </span>
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <h3 className="font-semibold text-foreground text-base truncate">
+                                        {apt.service_type}
+                                      </h3>
+                                      {apt.status !== 'blocked' && (
+                                        <>
+                                          <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+                                            <User className="w-3 h-3 flex-shrink-0" />
+                                            <span className="truncate">{apt.client_name}</span>
+                                          </div>
+                                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                            <Phone className="w-3 h-3 flex-shrink-0" />
+                                            <span className="truncate">{apt.client_phone}</span>
+                                          </div>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="flex flex-col items-end gap-1.5 flex-shrink-0 ml-2">
+                                    {isOverdue && (
+                                      <span className="px-2 py-1 text-xs rounded-full border border-yellow-500/50 bg-yellow-500/20 text-yellow-400 whitespace-nowrap">
+                                        Atrasado
+                                      </span>
+                                    )}
+                                    <span className={`px-2 py-1 text-xs rounded-full border whitespace-nowrap ${getStatusColor(apt.status)}`}>
+                                      {apt.status === 'scheduled' && 'Agendado'}
+                                      {apt.status === 'confirmed' && 'Confirmado'}
+                                      {apt.status === 'completed' && 'Concluído'}
+                                      {apt.status === 'blocked' && 'Bloqueado'}
+                                      {apt.status === 'cancelled' && 'Cancelado'}
+                                      {apt.status === 'no_show' && 'Não Compareceu'}
+                                    </span>
+                                    {(apt.status === 'scheduled' || apt.status === 'confirmed') && (
+                                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap justify-end">
+                                        <button
+                                          onClick={() => handleOpenEdit(apt)}
+                                          className="p-2 rounded-md bg-muted text-foreground hover:bg-muted/80 transition-colors min-w-[40px] min-h-[40px] flex items-center justify-center"
+                                          title="Editar agendamento"
+                                          aria-label="Editar agendamento"
+                                        >
+                                          <Pencil className="w-5 h-5" />
+                                        </button>
+                                        <button
+                                          onClick={() => handleComplete(apt.id)}
+                                          className="p-2 rounded-md bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors min-w-[40px] min-h-[40px] flex items-center justify-center"
+                                          title="Concluir"
+                                          aria-label="Concluir"
+                                        >
+                                          <Check className="w-5 h-5" />
+                                        </button>
+                                        <button
+                                          onClick={() => handleQuickReminder(apt)}
+                                          className="p-2 rounded-md bg-primary/20 text-primary hover:bg-primary/30 transition-colors min-w-[40px] min-h-[40px] flex items-center justify-center"
+                                          title="Lembrete rápido"
+                                          aria-label="Lembrete rápido"
+                                        >
+                                          <MessageCircle className="w-5 h-5" />
+                                        </button>
+                                        <button
+                                          onClick={() => handleCancel(apt.id)}
+                                          className="p-2 rounded-md bg-destructive/20 text-destructive hover:bg-destructive/30 transition-colors min-w-[40px] min-h-[40px] flex items-center justify-center"
+                                          title="Cancelar"
+                                          aria-label="Cancelar"
+                                        >
+                                          <X className="w-5 h-5" />
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </motion.div>
+                            );
+                          })}
+                        </AnimatePresence>
                       </div>
                     </div>
-                    
-                    <div className="flex flex-col items-end gap-1.5">
-                      {isOverdue && (
-                        <span className="px-2 py-1 text-xs rounded-full border border-yellow-500/50 bg-yellow-500/20 text-yellow-400">
-                          Atrasado / Pendente
-                        </span>
-                      )}
-                      <span className={`px-2 py-1 text-xs rounded-full border ${getStatusColor(apt.status)}`}>
-                        {apt.status === 'scheduled' && 'Agendado'}
-                        {apt.status === 'confirmed' && 'Confirmado'}
-                        {apt.status === 'completed' && 'Concluído'}
-                        {apt.status === 'blocked' && 'Bloqueado'}
-                        {apt.status === 'cancelled' && 'Cancelado pelo Cliente'}
-                        {apt.status === 'no_show' && 'Não Compareceu'}
-                      </span>
-                      {(apt.status === 'scheduled' || apt.status === 'confirmed') && (
-                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                          <button
-                            onClick={() => handleOpenEdit(apt)}
-                            className="p-2.5 rounded-md bg-muted text-foreground hover:bg-muted/80 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
-                            title="Editar agendamento"
-                            aria-label="Editar agendamento"
-                          >
-                            <Pencil className="w-6 h-6" />
-                          </button>
-                          <button
-                            onClick={() => handleComplete(apt.id)}
-                            className="p-2.5 rounded-md bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
-                            title="Concluir"
-                            aria-label="Concluir"
-                          >
-                            <Check className="w-6 h-6" />
-                          </button>
-                          <button
-                            onClick={() => handleQuickReminder(apt)}
-                            className="p-2.5 rounded-md bg-primary/20 text-primary hover:bg-primary/30 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
-                            title="Lembrete rápido"
-                            aria-label="Lembrete rápido"
-                          >
-                            <MessageCircle className="w-6 h-6" />
-                          </button>
-                          <button
-                            onClick={() => handleCancel(apt.id)}
-                            className="p-2.5 rounded-md bg-destructive/20 text-destructive hover:bg-destructive/30 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
-                            title="Cancelar"
-                            aria-label="Cancelar"
-                          >
-                            <X className="w-6 h-6" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
-              )})}
-            </AnimatePresence>
-              )}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
           );
