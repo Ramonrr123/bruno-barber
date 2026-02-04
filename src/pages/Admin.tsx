@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { format, addDays, subDays, isToday, parseISO, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
+import { format, addDays, parseISO, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
   Clock, 
@@ -16,7 +16,6 @@ import {
   ChevronLeft,
   ChevronRight,
   MessageCircle,
-  Ban,
   Scissors,
   Calendar,
   Lock,
@@ -610,6 +609,17 @@ export default function Admin() {
       {/* Logo do sapo no fundo - discreto para não competir com o conteúdo (UX) */}
       <div
         className="fixed inset-0 z-0 flex items-center justify-center pointer-events-none"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          transform: 'translateZ(0)',
+          WebkitTransform: 'translateZ(0)',
+          WebkitBackfaceVisibility: 'hidden',
+          backfaceVisibility: 'hidden',
+        }}
         aria-hidden
       >
         <div
@@ -621,7 +631,10 @@ export default function Admin() {
             backgroundRepeat: 'no-repeat',
             opacity: 0.38,
             filter: 'blur(3px)',
-            transform: 'scale(2.2)',
+            transform: 'scale(2.2) translateZ(0)',
+            WebkitTransform: 'scale(2.2) translateZ(0)',
+            WebkitBackfaceVisibility: 'hidden',
+            backfaceVisibility: 'hidden',
           }}
         />
       </div>
