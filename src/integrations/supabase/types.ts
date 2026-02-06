@@ -20,6 +20,7 @@ export type Database = {
           client_name: string
           client_phone: string
           created_at: string
+          custom_price: number | null
           end_time: string
           id: string
           service_type: string
@@ -31,6 +32,7 @@ export type Database = {
           client_name: string
           client_phone: string
           created_at?: string
+          custom_price?: number | null
           end_time: string
           id?: string
           service_type: string
@@ -42,6 +44,7 @@ export type Database = {
           client_name?: string
           client_phone?: string
           created_at?: string
+          custom_price?: number | null
           end_time?: string
           id?: string
           service_type?: string

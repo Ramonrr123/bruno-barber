@@ -56,6 +56,8 @@ export default function Admin() {
     clientName: '',
     clientPhone: '',
     serviceType: '',
+    customPrice: 0,
+    priceLocked: false,
     appointmentDate: '',
     startTime: '09:00',
     duration: 30,
@@ -420,11 +422,15 @@ export default function Admin() {
   const handleOpenEdit = (apt: Appointment) => {
     const service = services.find(s => s.name === apt.service_type);
     const duration = service?.duration ?? 30;
+    const defaultPrice = service?.price ?? 0;
+    const hasCustomPrice = apt.custom_price != null;
     setEditingAppointment(apt);
     setEditForm({
       clientName: apt.client_name ?? '',
       clientPhone: apt.client_phone ?? '',
       serviceType: apt.service_type ?? '',
+      customPrice: hasCustomPrice ? apt.custom_price! : defaultPrice,
+      priceLocked: hasCustomPrice,
       appointmentDate: apt.appointment_date ?? '',
       startTime: apt.start_time?.slice(0, 5) ?? '09:00',
       duration,
@@ -447,6 +453,10 @@ export default function Admin() {
       const endMins = totalMinutes % 60;
       const endTime = `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`;
 
+      const service = services.find(s => s.name === editForm.serviceType);
+      const defaultPrice = service?.price ?? 0;
+      const customPrice = editForm.customPrice === defaultPrice ? null : editForm.customPrice;
+
       const { error } = await supabase
         .from('appointments')
         .update({
@@ -456,6 +466,7 @@ export default function Admin() {
           appointment_date: editForm.appointmentDate,
           start_time: editForm.startTime,
           end_time: endTime,
+          custom_price: customPrice,
         })
         .eq('id', editingAppointment.id);
 
@@ -1110,6 +1121,8 @@ export default function Admin() {
                           ...editForm,
                           serviceType: e.target.value,
                           duration: service?.duration ?? 30,
+                          customPrice: service?.price ?? 0,
+                          priceLocked: false,
                         });
                       }}
                       className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
@@ -1121,6 +1134,35 @@ export default function Admin() {
                         </option>
                       ))}
                     </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-base font-medium text-foreground mb-2">
+                      Valor (R$)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      value={editForm.customPrice}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(',', '.');
+                        const num = raw === '' ? 0 : parseFloat(raw) || 0;
+                        setEditForm({
+                          ...editForm,
+                          customPrice: Math.max(0, num),
+                          priceLocked: true,
+                        });
+                      }}
+                      onBlur={() => {
+                        setEditForm((prev) => ({
+                          ...prev,
+                          customPrice: Math.max(0, Number(prev.customPrice.toFixed(2))),
+                        }));
+                      }}
+                      placeholder="0.00"
+                      className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
                   </div>
 
                   <div>

@@ -32,6 +32,8 @@ export interface Appointment {
   end_time: string;
   status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'blocked' | 'no_show';
   admin_notes?: string;
+  /** Preço customizado para este agendamento. Quando null, usa o preço padrão do serviço. */
+  custom_price?: number | null;
 }
 
 export interface Exception {
