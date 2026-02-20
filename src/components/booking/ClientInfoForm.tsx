@@ -132,53 +132,36 @@ export function ClientInfoForm({
         return;
       }
 
-      console.log('Salvando agendamento no banco:', appointmentData);
-      console.log('Tipos dos dados:', {
-        client_name: typeof appointmentData.client_name,
-        client_phone: typeof appointmentData.client_phone,
-        service_type: typeof appointmentData.service_type,
-        appointment_date: typeof appointmentData.appointment_date,
-        start_time: typeof appointmentData.start_time,
-        end_time: typeof appointmentData.end_time,
-        status: typeof appointmentData.status,
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      if (!supabaseUrl || !anonKey) {
+        notification.error('Configuração do servidor ausente. Tente mais tarde.');
+        return;
+      }
+
+      const res = await fetch(`${supabaseUrl}/functions/v1/create-appointment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${anonKey}`,
+        },
+        body: JSON.stringify(appointmentData),
       });
 
-      const { data: insertedData, error: insertError } = await supabase
-        .from('appointments')
-        .insert(appointmentData)
-        .select();
+      const responseData = await res.json().catch(() => ({}));
+      const errorMessageFromServer = responseData?.error;
 
-      if (insertError) {
-        console.error('❌ ERRO AO SALVAR AGENDAMENTO:', insertError);
-        console.error('📋 Dados que tentaram ser salvos:', appointmentData);
-        console.error('🔍 Detalhes completos do erro:', {
-          message: insertError.message,
-          code: insertError.code,
-          details: insertError.details,
-          hint: insertError.hint,
-        });
-        
-        // Mensagem de erro mais específica e útil
-        let errorMessage = 'Erro ao salvar agendamento.';
-        
-        if (insertError.message?.includes('column') && insertError.message?.includes('does not exist')) {
-          const columnMatch = insertError.message.match(/column "(\w+)" does not exist/);
-          const columnName = columnMatch ? columnMatch[1] : 'desconhecida';
-          errorMessage = `Erro: Coluna "${columnName}" não existe. Execute o SQL de correção no Supabase.`;
-        } else if (insertError.message?.includes('null value') && insertError.message?.includes('violates not-null constraint')) {
-          const columnMatch = insertError.message.match(/column "(\w+)" of relation/);
-          const columnName = columnMatch ? columnMatch[1] : 'desconhecida';
-          errorMessage = `Erro: Coluna "${columnName}" está faltando. Verifique a estrutura da tabela.`;
-        } else if (insertError.code === 'PGRST116') {
-          errorMessage = 'Erro: Tabela não encontrada. Verifique a configuração do Supabase.';
-        } else if (insertError.message?.includes('JWT') || insertError.code === 'PGRST301') {
-          errorMessage = 'Erro de autenticação. Verifique as variáveis de ambiente (VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY).';
-        } else {
-          errorMessage = `Erro: ${insertError.message || insertError.code || 'Erro desconhecido'}`;
+      if (!res.ok) {
+        if (res.status === 429) {
+          notification.error(errorMessageFromServer || 'Muitas tentativas. Por favor, aguarde 15 minutos.');
+          return;
         }
-        
-        notification.error(errorMessage);
-        throw insertError;
+        if (res.status === 400) {
+          notification.error(errorMessageFromServer || 'Dados inválidos. Verifique e tente novamente.');
+          return;
+        }
+        notification.error(errorMessageFromServer || 'Erro ao salvar agendamento. Tente novamente.');
+        return;
       }
 
       // Agendamento salvo com sucesso

@@ -46,63 +46,50 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      // Debug: verificar se as variáveis de ambiente estão configuradas
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      
-      if (!supabaseUrl || !supabaseKey) {
-        console.error('Variáveis de ambiente não configuradas:', {
-          url: !!supabaseUrl,
-          key: !!supabaseKey
-        });
-        notification.error('Erro de configuração: Verifique as variáveis de ambiente do Supabase');
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const cleanEmail = email.trim().toLowerCase();
+
+      if (!supabaseUrl || !anonKey) {
+        notification.error('Erro de configuração. Verifique as variáveis de ambiente do Supabase');
         return;
       }
 
-      // Limpar email de espaços e converter para lowercase
-      const cleanEmail = email.trim().toLowerCase();
-      
-      console.log('Tentando fazer login com:', { email: cleanEmail });
-      
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: cleanEmail,
-        password: password.trim(),
+      const res = await fetch(`${supabaseUrl}/functions/v1/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, password: password.trim() }),
       });
 
-      if (error) {
-        console.error('Erro do Supabase:', {
-          message: error.message,
-          status: error.status,
-          name: error.name
-        });
-        throw error;
+      const body = await res.json().catch(() => ({}));
+
+      if (res.status === 429) {
+        notification.error(body?.error || 'Muitas tentativas. Por favor, aguarde 15 minutos.');
+        return;
       }
 
-      console.log('Login bem-sucedido:', { session: !!data.session });
+      if (!res.ok) {
+        notification.error(body?.error || 'Erro ao fazer login. Verifique suas credenciais.');
+        return;
+      }
 
-      if (data.session) {
+      if (body?.session) {
+        const { error: setError } = await supabase.auth.setSession({
+          access_token: body.session.access_token,
+          refresh_token: body.session.refresh_token,
+        });
+        if (setError) {
+          notification.error(setError.message || 'Erro ao iniciar sessão.');
+          return;
+        }
         notification.success('Login realizado com sucesso!');
         navigate('/admin', { replace: true });
       } else {
         notification.error('Sessão não criada. Tente novamente.');
       }
-    } catch (error: any) {
-      console.error('Login error completo:', error);
-      
-      // Mensagem de erro mais clara e específica
-      let errorMessage = 'Erro ao fazer login. Verifique suas credenciais.';
-      
-      if (error.message?.includes('Invalid login credentials')) {
-        errorMessage = 'Email ou senha incorretos. No Supabase Dashboard → Authentication → Users, edite o usuário e defina uma nova senha, ou use "Send Password Reset Email".';
-      } else if (error.message?.includes('Email not confirmed')) {
-        errorMessage = 'Email não confirmado. Verifique seu email ou ative "Auto Confirm User" no Supabase.';
-      } else if (error.message?.includes('User not found')) {
-        errorMessage = 'Usuário não encontrado. Verifique se o usuário foi criado corretamente no Supabase.';
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      notification.error(errorMessage);
+    } catch (error: unknown) {
+      console.error('Login error:', error);
+      notification.error('Erro de conexão. Tente novamente.');
     } finally {
       setIsLoading(false);
     }
