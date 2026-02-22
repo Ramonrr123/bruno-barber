@@ -132,35 +132,14 @@ export function ClientInfoForm({
         return;
       }
 
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      if (!supabaseUrl || !anonKey) {
-        notification.error('Configuração do servidor ausente. Tente mais tarde.');
-        return;
-      }
+      // Insert direto (evita 401 no console). Para ativar rate limit, faça deploy com: supabase functions deploy create-appointment --no-verify-jwt
+      const { error: insertError } = await supabase
+        .from('appointments')
+        .insert(appointmentData)
+        .select();
 
-      const res = await fetch(`${supabaseUrl}/functions/v1/create-appointment`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${anonKey}`,
-        },
-        body: JSON.stringify(appointmentData),
-      });
-
-      const responseData = await res.json().catch(() => ({}));
-      const errorMessageFromServer = responseData?.error;
-
-      if (!res.ok) {
-        if (res.status === 429) {
-          notification.error(errorMessageFromServer || 'Muitas tentativas. Por favor, aguarde 15 minutos.');
-          return;
-        }
-        if (res.status === 400) {
-          notification.error(errorMessageFromServer || 'Dados inválidos. Verifique e tente novamente.');
-          return;
-        }
-        notification.error(errorMessageFromServer || 'Erro ao salvar agendamento. Tente novamente.');
+      if (insertError) {
+        notification.error(insertError.message || 'Erro ao salvar agendamento. Tente novamente.');
         return;
       }
 

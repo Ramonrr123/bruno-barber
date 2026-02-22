@@ -1,1 +1,9 @@
 project_id = "fvrklxqecpttmvpgscpd"
+
+# Funções chamadas pelo front sem sessão (agendamento público e login)
+# verify_jwt = false evita 401 quando a chamada usa só a anon key ou há problema de token
+[functions.create-appointment]
+verify_jwt = false
+
+[functions.login]
+verify_jwt = false
