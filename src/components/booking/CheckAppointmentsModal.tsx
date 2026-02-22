@@ -115,44 +115,25 @@ export function CheckAppointmentsModal({ isOpen, onClose }: CheckAppointmentsMod
 
       if (error) throw error;
 
-      // Enviar notificação do Telegram (fire-and-forget, não bloqueia a resposta)
+      // Atualização imediata: remove o item da lista para sumir da tela na hora
+      setAppointments((prev) => prev.filter((a) => a.id !== appointmentId));
+
+      // Notificação no Telegram (fire-and-forget)
       if (appointmentData) {
         const formattedDate = format(parseISO(appointmentDate), 'dd/MM', { locale: ptBR });
         const formattedDateTime = `${formattedDate} às ${appointmentTime.slice(0, 5)}`;
-        
         sendTelegramNotification({
           type: 'CANCELED',
           clientName: appointmentData.client_name,
           phone: appointmentData.client_phone,
           serviceName: appointmentData.service_type,
           date: formattedDateTime,
-        }).catch((error) => {
-          console.error('Erro ao enviar notificação do Telegram:', error);
-          // Não mostra erro para o usuário, pois a operação principal já foi bem-sucedida
+        }).catch((err) => {
+          console.error('Erro ao enviar cancelamento para o Telegram:', err);
         });
       }
 
       notification.success('Agendamento cancelado! O horário está disponível novamente.');
-      
-      // Recarregar a lista
-      const cleanPhone = sanitizePhone(phone);
-      const today = format(startOfToday(), 'yyyy-MM-dd');
-      
-      const { data, error: refreshError } = await supabase
-        .from('appointments')
-        .select('*')
-        .eq('client_phone', cleanPhone)
-        .in('status', ['confirmed', 'scheduled'])
-        .gte('appointment_date', today)
-        .order('appointment_date', { ascending: true })
-        .order('start_time', { ascending: true });
-
-      if (!refreshError) {
-        setAppointments((data as Appointment[]) || []);
-      }
-
-      // O horário agora está disponível automaticamente (não aparece mais nas buscas de disponibilidade)
-      // Horário liberado com sucesso
       
     } catch (error) {
       console.error('Error cancelling appointment:', error);

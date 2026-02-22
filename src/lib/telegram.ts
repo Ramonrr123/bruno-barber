@@ -82,20 +82,25 @@ export async function sendTelegramNotification({
       `<a href="${whatsappLink}">Mandar Zap perguntando o motivo</a>`;
   }
 
-  // 4. Envio Silencioso (Fire and Forget)
+  // 4. Envio para o Telegram
   try {
-    await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+    const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: TELEGRAM_CHAT_ID,
         text: messageText,
-        parse_mode: 'HTML', // HTML é mais robusto para links longos
-        disable_web_page_preview: true // Deixa a mensagem mais limpa
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
       }),
     });
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.error('Telegram API erro:', res.status, errBody);
+      throw new Error(`Telegram ${res.status}: ${errBody}`);
+    }
   } catch (error) {
     console.error('Erro ao enviar Telegram:', error);
-    // Não damos "throw" para não quebrar o site se o Telegram falhar
+    throw error; // Propaga para o caller poder logar (ex.: cancelamento)
   }
 }
