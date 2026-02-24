@@ -128,6 +128,22 @@ TO authenticated
 USING (auth.role() = 'authenticated')
 WITH CHECK (auth.role() = 'authenticated');
 
+-- Policy: UPDATE - Permitir que clientes (anon) apenas cancelem seus agendamentos futuros
+-- Esta policy libera apenas a troca de status para 'cancelled' em agendamentos ainda não realizados.
+-- Qualquer outro tipo de alteração continua bloqueado para anon.
+CREATE POLICY "Anon users can cancel future appointments"
+ON public.appointments
+FOR UPDATE
+TO anon
+USING (
+  status IN ('scheduled', 'confirmed')
+  AND appointment_date >= CURRENT_DATE
+)
+WITH CHECK (
+  status = 'cancelled'
+  AND appointment_date >= CURRENT_DATE
+);
+
 -- Policy: DELETE - Permitir APENAS para role authenticated (Admin)
 CREATE POLICY "Only authenticated users can delete appointments"
 ON public.appointments
