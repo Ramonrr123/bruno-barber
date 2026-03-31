@@ -30,6 +30,10 @@ export function ServiceCard({ service, onSelect, index }: ServiceCardProps) {
               <img 
                 src={service.image_url} 
                 alt={service.name}
+                width={56}
+                height={56}
+                loading="lazy"
+                decoding="async"
                 className="w-full h-full object-cover"
               />
             </div>

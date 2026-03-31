@@ -19,6 +19,64 @@ interface ServiceFormData {
   description: string;
 }
 
+const MAX_IMAGE_DIMENSION = 1200;
+const COMPRESSED_IMAGE_QUALITY = 0.82;
+
+const getImageExtensionFromMime = (mimeType: string): string => {
+  if (mimeType === 'image/png') return 'png';
+  if (mimeType === 'image/webp') return 'webp';
+  if (mimeType === 'image/gif') return 'gif';
+  return 'jpg';
+};
+
+const optimizeImageForUpload = async (file: File): Promise<File> => {
+  if (!file.type.startsWith('image/')) return file;
+
+  // Mantém GIF original para não quebrar animações.
+  if (file.type === 'image/gif') return file;
+
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(img);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Falha ao carregar imagem para compressão'));
+    };
+    img.src = objectUrl;
+  });
+
+  const { width, height } = image;
+  const largerSide = Math.max(width, height);
+  const scale = largerSide > MAX_IMAGE_DIMENSION ? MAX_IMAGE_DIMENSION / largerSide : 1;
+
+  const targetWidth = Math.max(1, Math.round(width * scale));
+  const targetHeight = Math.max(1, Math.round(height * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+  const ctx = canvas.getContext('2d');
+
+  if (!ctx) return file;
+
+  ctx.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+  const blob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, 'image/webp', COMPRESSED_IMAGE_QUALITY);
+  });
+
+  if (!blob) return file;
+
+  // Se o arquivo otimizado ficou maior, mantém o original.
+  if (blob.size >= file.size) return file;
+
+  return new File([blob], `${file.name.replace(/\.[^.]+$/, '')}.webp`, { type: blob.type });
+};
+
 export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
   const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -168,16 +226,18 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
 
   const uploadImage = async (file: File): Promise<string | null> => {
     try {
+      const optimizedFile = await optimizeImageForUpload(file).catch(() => file);
+
       // Gerar nome único para o arquivo
-      const fileExt = file.name.split('.').pop();
+      const fileExt = getImageExtensionFromMime(optimizedFile.type);
       const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
       const filePath = `services/${fileName}`;
 
       // Fazer upload para o bucket
       const { error: uploadError } = await supabase.storage
         .from('service-images')
-        .upload(filePath, file, {
-          cacheControl: '3600',
+        .upload(filePath, optimizedFile, {
+          cacheControl: '31536000',
           upsert: false,
         });
 
@@ -508,6 +568,10 @@ export function ServicesManager({ isOpen, onClose }: ServicesManagerProps) {
                             <img 
                               src={service.image_url} 
                               alt={service.name}
+                              width={48}
+                              height={48}
+                              loading="lazy"
+                              decoding="async"
                               className="w-full h-full object-cover"
                             />
                           ) : (

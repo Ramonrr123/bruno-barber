@@ -19,6 +19,10 @@ export function Header() {
         <img 
           src="/logo.png" 
           alt="Logo Barbearia Sapo do Corte - Agendamento Online"
+          width={160}
+          height={160}
+          fetchPriority="high"
+          decoding="async"
           className="w-32 md:w-40 mx-auto drop-shadow-[0_0_15px_rgba(57,255,20,0.5)] mb-3"
           style={{ 
             display: 'block'

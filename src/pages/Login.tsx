@@ -116,6 +116,10 @@ export default function Login() {
           <img
             src="/logo.png"
             alt="Logo Barbearia"
+            width={96}
+            height={96}
+            fetchPriority="high"
+            decoding="async"
             className="h-24 w-24 object-contain"
             onError={(e) => {
               // Fallback se a imagem não existir
