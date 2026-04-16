@@ -9,7 +9,19 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="icon" type="image/png" href="/logo.png" />
     <link rel="apple-touch-icon" href="/logo.png" />
-    <link rel="preload" as="image" href="/logo.png" fetchpriority="high" />
+
+    <!-- Preload logo em WebP (formato moderno, 88% menor) -->
+    <link rel="preload" as="image" href="/logo.webp" type="image/webp" fetchpriority="high" />
+
+    <!-- Preconnect Google Fonts para reduzir latência de DNS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Carregamento não-bloqueante da fonte (font-display: swap via Google) -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" media="print" onload="this.media='all'" />
+    <noscript>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" />
+    </noscript>
+
     <title>Sapo do Corte | Agendamento</title>
     <meta name="description" content="Agende seu corte na Sapo do Corte Barbershop em segundos. Cortes modernos, atendimento premium." />
 

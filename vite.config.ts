@@ -30,6 +30,10 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
+    // Gera código ES moderno (menor bundle, sem polyfills desnecessários)
+    target: "es2020",
+    // Avisa quando um chunk ultrapassa 500KB antes de gzip
+    chunkSizeWarningLimit: 500,
     rollupOptions: {
       output: {
         manualChunks(id) {
