@@ -114,8 +114,8 @@ export default function Login() {
         {/* Logo */}
         <div className="flex justify-center mb-8">
           <img
-            src="/logo.png"
-            alt="Logo Barbearia"
+            src="/brunologo.png"
+            alt="Logo Bruno Barber"
             width={96}
             height={96}
             fetchPriority="high"

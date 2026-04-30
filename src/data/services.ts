@@ -19,7 +19,7 @@ export const services: Service[] = [
   },
   {
     id: 'combo-sapo',
-    name: 'Combo Sapo',
+    name: 'Combo Bruno',
     duration: 70,
     price: 85,
     description: 'Cabelo + Barba completa - O pacote premium',
