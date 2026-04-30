@@ -17,15 +17,14 @@ export function Header() {
         className="text-center py-6 px-4 relative"
       >
         <picture>
-          <source srcSet="/logo.webp" type="image/webp" />
           <img
-            src="/logo.png"
-            alt="Logo Barbearia Sapo do Corte - Agendamento Online"
+            src="/profile-bruno.png"
+            alt="Foto de perfil do Bruno Barbeiro"
             width={160}
             height={160}
             fetchPriority="high"
             decoding="async"
-            className="w-32 md:w-40 mx-auto drop-shadow-[0_0_15px_rgba(57,255,20,0.5)] mb-3 block"
+            className="w-32 md:w-40 mx-auto rounded-full object-cover border-2 border-primary/40 drop-shadow-[0_0_15px_rgba(147,68,25,0.45)] mb-3 block"
             onError={(e) => {
               const target = e.target as HTMLImageElement;
               target.style.display = 'none';
