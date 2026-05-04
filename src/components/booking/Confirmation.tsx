@@ -4,6 +4,10 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { BookingData } from '@/types/booking';
 import { BARBER_NAME } from '@/data/constants';
+
+function displayProfessionalName(name: string | null | undefined) {
+  return name?.trim() || BARBER_NAME;
+}
 import { getServiceIcon } from '@/lib/serviceIcons';
 
 // Dados do endereço da barbearia
@@ -29,7 +33,7 @@ function calculateEndTime(startTime: string, durationMinutes: number): string {
 }
 
 export function Confirmation({ bookingData, onNewBooking }: ConfirmationProps) {
-  const { service, date, time, clientName } = bookingData;
+  const { service, date, time, clientName, professionalName } = bookingData;
   
   if (!service || !date || !time) return null;
 
@@ -97,7 +101,7 @@ export function Confirmation({ bookingData, onNewBooking }: ConfirmationProps) {
           </div>
           <div className="flex items-center gap-2 text-foreground">
             <Clock className="w-4 h-4 text-primary/80" />
-            <span className="font-semibold">{time} - {endTime} • Profissional: {BARBER_NAME}</span>
+            <span className="font-semibold">{time} - {endTime} • Profissional: {displayProfessionalName(professionalName)}</span>
           </div>
         </div>
       </motion.div>

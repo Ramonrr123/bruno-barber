@@ -23,6 +23,7 @@ export type Database = {
           custom_price: number | null
           end_time: string
           id: string
+          professional: string | null
           service_type: string
           start_time: string
           status: string
@@ -35,6 +36,7 @@ export type Database = {
           custom_price?: number | null
           end_time: string
           id?: string
+          professional?: string | null
           service_type: string
           start_time: string
           status?: string
@@ -47,6 +49,7 @@ export type Database = {
           custom_price?: number | null
           end_time?: string
           id?: string
+          professional?: string | null
           service_type?: string
           start_time?: string
           status?: string

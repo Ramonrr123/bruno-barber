@@ -7,7 +7,7 @@ interface StepIndicatorProps {
 }
 
 export function StepIndicator({ currentStep, totalSteps }: StepIndicatorProps) {
-  const steps = ['Serviço', 'Horário', 'Dados', 'Pronto'];
+  const steps = ['Serviço', 'Profissional', 'Horário', 'Dados', 'Pronto'];
 
   return (
     <div className="flex items-center justify-center gap-2 px-4 mb-6">

@@ -9,10 +9,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { checkDateAvailability, generateAvailableSlots } from '@/lib/availability';
 import { getServiceIcon } from '@/lib/serviceIcons';
 import { formatDuration } from '@/lib/formatDuration';
-import { BARBER_NAME } from '@/data/constants';
-
 interface DateTimeSelectionProps {
   service: Service;
+  professionalName: string;
   selectedDate: Date | null;
   selectedTime: string | null;
   onSelectDate: (date: Date) => void;
@@ -50,6 +49,7 @@ function calculateEndTime(startTime: string, durationMinutes: number): string {
 
 export function DateTimeSelection({
   service,
+  professionalName,
   selectedDate,
   selectedTime,
   onSelectDate,
@@ -183,7 +183,7 @@ export function DateTimeSelection({
               {formatDuration(service.duration)} • <span className="text-primary font-semibold neon-text">R$ {service.price.toFixed(2).replace('.', ',')}</span>
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Profissional: <span className="text-foreground font-medium">{BARBER_NAME}</span>
+              Profissional: <span className="text-foreground font-medium">{professionalName}</span>
             </p>
           </div>
         </div>

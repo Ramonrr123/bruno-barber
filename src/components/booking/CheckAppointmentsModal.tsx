@@ -4,7 +4,6 @@ import { X, Phone, Loader2, Calendar, Clock, Scissors, Trash2 } from 'lucide-rea
 import { supabase } from '@/integrations/supabase/client';
 import { Appointment } from '@/types/booking';
 import { format, parseISO, isAfter, startOfToday } from 'date-fns';
-import { BARBER_NAME } from '@/data/constants';
 import { ptBR } from 'date-fns/locale';
 import { notification } from '@/hooks/useNotification';
 import { showConfirm as confirm } from '@/hooks/useConfirm';
@@ -250,7 +249,7 @@ export function CheckAppointmentsModal({ isOpen, onClose }: CheckAppointmentsMod
                             <div className="flex items-center gap-2">
                               <Clock className="w-4 h-4" />
                               <span>
-                                {apt.start_time.slice(0, 5)} - {apt.end_time.slice(0, 5)} • Profissional: {BARBER_NAME}
+                                {apt.start_time.slice(0, 5)} - {apt.end_time.slice(0, 5)} • Profissional: {apt.professional?.trim() || '—'}
                               </span>
                             </div>
                           </div>

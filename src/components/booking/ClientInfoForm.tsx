@@ -6,7 +6,6 @@ import { ptBR } from 'date-fns/locale';
 import { Service } from '@/types/booking';
 import { supabase } from '@/integrations/supabase/client';
 import { notification } from '@/hooks/useNotification';
-import { BARBER_NAME } from '@/data/constants';
 import { getServiceIcon } from '@/lib/serviceIcons';
 import { formatDuration } from '@/lib/formatDuration';
 import { sendTelegramNotification } from '@/lib/telegram';
@@ -22,6 +21,7 @@ const formatPhone = (value: string): string => {
 
 interface ClientInfoFormProps {
   service: Service;
+  professionalName: string;
   date: Date;
   time: string;
   onBack: () => void;
@@ -39,6 +39,7 @@ function calculateEndTime(startTime: string, durationMinutes: number): string {
 
 export function ClientInfoForm({
   service,
+  professionalName,
   date,
   time,
   onBack,
@@ -123,6 +124,7 @@ export function ClientInfoForm({
         appointment_date: dateStr,
         start_time: time,
         end_time: endTime,
+        professional: professionalName,
         status: 'confirmed' as const,
       };
 
@@ -155,6 +157,7 @@ export function ClientInfoForm({
         phone: phone.replace(/\D/g, ''),
         serviceName: service.name,
         date: formattedDateTime,
+        professionalName,
       }).catch((error) => {
         console.error('Erro ao enviar notificação do Telegram:', error);
         // Não mostra erro para o usuário, pois a operação principal já foi bem-sucedida
@@ -207,7 +210,7 @@ export function ClientInfoForm({
             📅 {format(date, "EEEE, d 'de' MMMM", { locale: ptBR })}
           </p>
           <p className="text-sm text-primary font-semibold mt-1">
-            🕐 {time} - {calculateEndTime(time, service.duration)} • Profissional: {BARBER_NAME}
+            🕐 {time} - {calculateEndTime(time, service.duration)} • Profissional: {professionalName}
           </p>
         </div>
       </div>

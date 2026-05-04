@@ -29,6 +29,7 @@ import { BlockTimeManager } from '@/components/admin/BlockTimeManager';
 import { ServicesManager } from '@/components/admin/ServicesManager';
 import { AdminSummaryCards } from '@/components/admin/AdminSummaryCards';
 import { sendTelegramNotification, getWhatsAppReminderLink } from '@/lib/telegram';
+import { BOOKING_PROFESSIONALS } from '@/data/constants';
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -41,6 +42,7 @@ export default function Admin() {
     clientName: '',
     clientPhone: '',
     serviceType: '',
+    professional: BOOKING_PROFESSIONALS[0],
     appointmentDate: '',
     startTime: '09:00',
     duration: 30,
@@ -56,6 +58,7 @@ export default function Admin() {
     clientName: '',
     clientPhone: '',
     serviceType: '',
+    professional: BOOKING_PROFESSIONALS[0],
     customPrice: 0,
     priceLocked: false,
     appointmentDate: '',
@@ -429,6 +432,7 @@ export default function Admin() {
       clientName: apt.client_name ?? '',
       clientPhone: apt.client_phone ?? '',
       serviceType: apt.service_type ?? '',
+      professional: apt.professional?.trim() || BOOKING_PROFESSIONALS[0],
       customPrice: hasCustomPrice ? apt.custom_price! : defaultPrice,
       priceLocked: hasCustomPrice,
       appointmentDate: apt.appointment_date ?? '',
@@ -463,6 +467,7 @@ export default function Admin() {
           client_name: editForm.clientName.trim(),
           client_phone: editForm.clientPhone.trim(),
           service_type: editForm.serviceType,
+          professional: editForm.professional.trim(),
           appointment_date: editForm.appointmentDate,
           start_time: editForm.startTime,
           end_time: endTime,
@@ -503,6 +508,7 @@ export default function Admin() {
           client_name: manualBooking.clientName,
           client_phone: manualBooking.clientPhone,
           service_type: manualBooking.serviceType,
+          professional: manualBooking.professional.trim(),
           appointment_date: manualBooking.appointmentDate,
           start_time: manualBooking.startTime,
           end_time: endTime,
@@ -517,6 +523,7 @@ export default function Admin() {
         clientName: '',
         clientPhone: '',
         serviceType: '',
+        professional: BOOKING_PROFESSIONALS[0],
         appointmentDate: format(selectedDate, 'yyyy-MM-dd'),
         startTime: '09:00',
         duration: 30,
@@ -680,6 +687,7 @@ export default function Admin() {
               onClick={() => {
                 setManualBooking({
                   ...manualBooking,
+                  professional: manualBooking.professional || BOOKING_PROFESSIONALS[0],
                   appointmentDate: format(selectedDate, 'yyyy-MM-dd'),
                 });
                 setShowManualBookingModal(true);
@@ -847,6 +855,12 @@ export default function Admin() {
                                             <Phone className="w-3 h-3 flex-shrink-0" />
                                             <span className="truncate">{apt.client_phone}</span>
                                           </div>
+                                          {apt.professional?.trim() && (
+                                            <div className="flex items-center gap-1 text-sm text-muted-foreground mt-0.5">
+                                              <User className="w-3 h-3 flex-shrink-0 opacity-70" aria-hidden />
+                                              <span className="truncate">Prof.: {apt.professional}</span>
+                                            </div>
+                                          )}
                                         </>
                                       )}
                                     </div>
@@ -1004,6 +1018,23 @@ export default function Admin() {
 
                   <div>
                     <label className="block text-base font-medium text-foreground mb-2">
+                      Profissional
+                    </label>
+                    <select
+                      value={manualBooking.professional}
+                      onChange={(e) =>
+                        setManualBooking({ ...manualBooking, professional: e.target.value })
+                      }
+                      className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                      {BOOKING_PROFESSIONALS.map((name) => (
+                        <option key={name} value={name}>{name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-base font-medium text-foreground mb-2">
                       Data
                     </label>
                     <input
@@ -1132,6 +1163,27 @@ export default function Admin() {
                         <option key={service.id} value={service.name}>
                           {service.name} ({service.duration} min)
                         </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-base font-medium text-foreground mb-2">
+                      Profissional
+                    </label>
+                    <select
+                      value={editForm.professional}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, professional: e.target.value })
+                      }
+                      className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                      {!(BOOKING_PROFESSIONALS as readonly string[]).includes(editForm.professional) &&
+                        editForm.professional && (
+                        <option value={editForm.professional}>{editForm.professional}</option>
+                      )}
+                      {BOOKING_PROFESSIONALS.map((name) => (
+                        <option key={name} value={name}>{name}</option>
                       ))}
                     </select>
                   </div>

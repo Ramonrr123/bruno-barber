@@ -15,6 +15,8 @@ export interface TimeSlot {
 
 export interface BookingData {
   service: Service | null;
+  /** Profissional escolhido antes de data/hora. */
+  professionalName: string | null;
   date: Date | null;
   time: string | null;
   clientName: string;
@@ -34,6 +36,8 @@ export interface Appointment {
   admin_notes?: string;
   /** Preço customizado para este agendamento. Quando null, usa o preço padrão do serviço. */
   custom_price?: number | null;
+  /** Nome do profissional escolhido pelo cliente */
+  professional?: string | null;
 }
 
 export interface Exception {

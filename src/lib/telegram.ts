@@ -35,6 +35,8 @@ interface NotificationProps {
   phone: string;
   serviceName: string;
   date: string; // Ex: "20/01 às 14:30"
+  /** Profissional escolhido no agendamento (opcional). */
+  professionalName?: string;
 }
 
 export async function sendTelegramNotification({
@@ -43,6 +45,7 @@ export async function sendTelegramNotification({
   phone,
   serviceName,
   date,
+  professionalName,
 }: NotificationProps) {
   if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) {
     console.error('⚠️ Telegram Env Vars faltando!');
@@ -69,9 +72,14 @@ export async function sendTelegramNotification({
   let messageText = '';
 
   if (type === 'NEW_APPOINTMENT') {
+    const proLine =
+      professionalName?.trim()
+        ? `💈 <b>Profissional:</b> ${escapeHtml(professionalName.trim())}\n`
+        : '';
     messageText = `💰 <b>NOVO AGENDAMENTO!</b>\n\n` +
       `👤 <b>Cliente:</b> ${escapeHtml(clientName)}\n` +
       `✂️ <b>Serviço:</b> ${escapeHtml(serviceName)}\n` +
+      proLine +
       `📅 <b>Data:</b> ${escapeHtml(date)}\n\n` +
       `👉 <a href="${whatsappLink}">CLIQUE AQUI PARA CONFIRMAR NO ZAP</a>`;
   } else {

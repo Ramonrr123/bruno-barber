@@ -37,6 +37,7 @@ Deno.serve(async (req) => {
     start_time?: string;
     end_time?: string;
     status?: string;
+    professional?: string | null;
   };
 
   try {
@@ -90,6 +91,8 @@ Deno.serve(async (req) => {
     );
   }
 
+  const prof = typeof body.professional === "string" ? body.professional.trim() : "";
+
   const appointmentData = {
     client_name: (body.client_name || "").trim(),
     client_phone: body.client_phone?.replace(/\D/g, "") ?? clientPhone,
@@ -98,6 +101,7 @@ Deno.serve(async (req) => {
     start_time: body.start_time || "",
     end_time: body.end_time || "",
     status: body.status || "confirmed",
+    ...(prof ? { professional: prof } : {}),
   };
 
   if (

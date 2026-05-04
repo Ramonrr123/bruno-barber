@@ -3,6 +3,7 @@ import { BookingData, Service } from '@/types/booking';
 
 const initialBookingData: BookingData = {
   service: null,
+  professionalName: null,
   date: null,
   time: null,
   clientName: '',
@@ -14,8 +15,13 @@ export function useBooking() {
   const [bookingData, setBookingData] = useState<BookingData>(initialBookingData);
 
   const selectService = (service: Service) => {
-    setBookingData((prev) => ({ ...prev, service }));
+    setBookingData((prev) => ({ ...prev, service, professionalName: null }));
     setStep(2);
+  };
+
+  const selectProfessional = (professionalName: string) => {
+    setBookingData((prev) => ({ ...prev, professionalName }));
+    setStep(3);
   };
 
   const selectDate = (date: Date) => {
@@ -24,7 +30,7 @@ export function useBooking() {
 
   const selectTime = (time: string) => {
     setBookingData((prev) => ({ ...prev, time }));
-    setStep(3);
+    setStep(4);
   };
 
   const setClientInfo = (name: string, phone: string) => {
@@ -41,13 +47,14 @@ export function useBooking() {
   };
 
   const confirmBooking = () => {
-    setStep(4);
+    setStep(5);
   };
 
   return {
     step,
     bookingData,
     selectService,
+    selectProfessional,
     selectDate,
     selectTime,
     setClientInfo,
