@@ -45,21 +45,75 @@ export default function Login() {
     e.preventDefault();
     setIsLoading(true);
 
-    try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      const cleanEmail = email.trim().toLowerCase();
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
 
+    const finishWithSession = async (accessToken: string, refreshToken: string) => {
+      const { error: setError } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+      if (setError) {
+        notification.error(setError.message || 'Erro ao iniciar sessão.');
+        return;
+      }
+      notification.success('Login realizado com sucesso!');
+      navigate('/admin', { replace: true });
+    };
+
+    const loginDirect = async () => {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password: cleanPassword,
+      });
+      if (error) {
+        notification.error(
+          error.message === 'Invalid login credentials'
+            ? 'Email ou senha incorretos.'
+            : error.message
+        );
+        return;
+      }
+      if (data.session) {
+        await finishWithSession(data.session.access_token, data.session.refresh_token);
+      } else {
+        notification.error('Sessão não criada. Tente novamente.');
+      }
+    };
+
+    try {
       if (!supabaseUrl || !anonKey) {
         notification.error('Erro de configuração. Verifique as variáveis de ambiente do Supabase');
         return;
       }
 
-      const res = await fetch(`${supabaseUrl}/functions/v1/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: cleanEmail, password: password.trim() }),
-      });
+      const loginUrl = `${supabaseUrl}/functions/v1/login`;
+      let res: Response;
+      try {
+        res = await fetch(loginUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: anonKey,
+            Authorization: `Bearer ${anonKey}`,
+          },
+          body: JSON.stringify({ email: cleanEmail, password: cleanPassword }),
+        });
+      } catch {
+        console.warn('[login] Edge Function indisponível ou CORS — usando Auth direto (sem rate limit na borda).');
+        await loginDirect();
+        return;
+      }
+
+      if (res.status === 404) {
+        console.warn(
+          '[login] Função Edge `login` não encontrada — faça `supabase functions deploy login`. Usando Auth direto.',
+        );
+        await loginDirect();
+        return;
+      }
 
       const body = await res.json().catch(() => ({}));
 
@@ -74,16 +128,7 @@ export default function Login() {
       }
 
       if (body?.session) {
-        const { error: setError } = await supabase.auth.setSession({
-          access_token: body.session.access_token,
-          refresh_token: body.session.refresh_token,
-        });
-        if (setError) {
-          notification.error(setError.message || 'Erro ao iniciar sessão.');
-          return;
-        }
-        notification.success('Login realizado com sucesso!');
-        navigate('/admin', { replace: true });
+        await finishWithSession(body.session.access_token, body.session.refresh_token);
       } else {
         notification.error('Sessão não criada. Tente novamente.');
       }
@@ -116,11 +161,10 @@ export default function Login() {
           <img
             src="/brunologo.png"
             alt="Logo Bruno Barber"
-            width={96}
-            height={96}
-            fetchPriority="high"
+            width={176}
+            height={176}
             decoding="async"
-            className="h-24 w-24 object-contain"
+            className="h-44 w-44 rounded-full object-cover object-center shadow-lg ring-2 ring-border/40"
             onError={(e) => {
               // Fallback se a imagem não existir
               const target = e.target as HTMLImageElement;

@@ -4,7 +4,7 @@ import { Calendar, MapPin } from 'lucide-react';
 import { CheckAppointmentsModal } from './CheckAppointmentsModal';
 
 // Dados do endereço da barbearia
-const BARBERSHOP_ADDRESS_SHORT = 'Rua Henrique Sorg, 310 - Canoinhas';
+const BARBERSHOP_ADDRESS_SHORT = 'Chakel Ruthemberg, 310 - União da Vitória';
 
 export function Header() {
   const [showCheckModal, setShowCheckModal] = useState(false);
