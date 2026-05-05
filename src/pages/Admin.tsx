@@ -624,7 +624,7 @@ export default function Admin() {
 
   return (
     <div className="min-h-screen bg-background p-4 pb-24 relative">
-      {/* Logo Bruno Barber no fundo - discreto para não competir com o conteúdo (UX) */}
+      {/* Logo Kings Barber Shop no fundo - discreto para não competir com o conteúdo (UX) */}
       <div
         className="fixed inset-0 z-0 flex items-center justify-center pointer-events-none"
         style={{
@@ -643,7 +643,7 @@ export default function Admin() {
         <div
           className="w-[min(70vw,320px)] h-[min(70vw,320px)] max-w-[320px] max-h-[320px] rounded-full"
           style={{
-            backgroundImage: `url(${import.meta.env.BASE_URL}brunologo.png)`,
+            backgroundImage: `url(${import.meta.env.BASE_URL}brunologo.jpg)`,
             backgroundSize: 'contain',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
@@ -662,7 +662,7 @@ export default function Admin() {
         <div className="mb-5 flex items-start justify-between gap-3">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-foreground">
-              Olá, {userDisplayName || 'Bruno'}
+              Olá, {userDisplayName || 'Kings Barber Shop'}
             </h1>
             <p className="text-sm text-muted-foreground mt-0.5">Você está em sua agenda.</p>
           </div>

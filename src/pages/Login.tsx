@@ -159,8 +159,8 @@ export default function Login() {
         {/* Logo */}
         <div className="flex justify-center mb-8">
           <img
-            src="/brunologo.png"
-            alt="Logo Bruno Barber"
+            src="/brunologo.jpg"
+            alt="Logo Kings Barber Shop"
             width={176}
             height={176}
             decoding="async"

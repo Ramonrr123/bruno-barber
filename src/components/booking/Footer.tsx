@@ -11,7 +11,7 @@ export function Footer() {
       <div className="max-w-lg mx-auto">
         {/* Copyright */}
         <p className="text-center text-xs text-gray-400">
-          Bruno Barber © 2026
+          Kings Barber Shop © 2026
         </p>
       </div>
     </motion.footer>

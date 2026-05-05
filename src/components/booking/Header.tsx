@@ -18,8 +18,8 @@ export function Header() {
       >
         <picture>
           <img
-            src="/brunologo.png"
-            alt="Logo Bruno Barber"
+            src="/brunologo.jpg"
+            alt="Logo Kings Barber Shop"
             width={160}
             height={160}
             fetchPriority="high"

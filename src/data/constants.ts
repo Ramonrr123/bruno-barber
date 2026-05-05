@@ -4,4 +4,4 @@ export const BOOKING_PROFESSIONALS = ['Lucas Favero', 'Daniel De Camargo'] as co
 export type BookingProfessionalName = (typeof BOOKING_PROFESSIONALS)[number];
 
 /** Nome institucional / fallback onde não há seleção específica. */
-export const BARBER_NAME = 'Bruno Michailek';
+export const BARBER_NAME = 'Kings Barber Shop';
