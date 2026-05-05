@@ -12,10 +12,10 @@ import { getServiceIcon } from '@/lib/serviceIcons';
 
 // Dados do endereço da barbearia
 const BARBERSHOP_ADDRESS = {
-  street: 'Chakel Ruthemberg, 310',
-  neighborhood: 'Sagrada Família',
-  city: 'União da Vitória - PR',
-  fullAddress: 'Chakel Ruthemberg, 310, Sagrada Família, União da Vitória - PR',
+  street: 'Caetano Costa, 800',
+  neighborhood: 'Sala 02',
+  city: 'Canoinhas - SC',
+  fullAddress: 'Caetano Costa, 800, Sala 02, Canoinhas - SC',
   googleMapsUrl: 'https://www.google.com/maps/place/Sagrada+Fam%C3%ADlia,+Uni%C3%A3o+da+Vit%C3%B3ria+-+PR,+84600-000/@-26.2347524,-51.0688689,4332m/data=!3m2!1e3!4b1!4m6!3m5!1s0x94e661dc2d9cb739:0xfa54e058e365d246!8m2!3d-26.2326916!4d-51.0710326!16s%2Fg%2F11b6_z_c_2?entry=ttu&g_ep=EgoyMDI2MDQyOS4wIKXMDSoASAFQAw%3D%3D'
 };
 
