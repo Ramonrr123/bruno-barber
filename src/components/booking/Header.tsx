@@ -24,7 +24,7 @@ export function Header() {
             height={160}
             fetchPriority="high"
             decoding="async"
-            className="w-32 md:w-40 mx-auto rounded-full object-cover border-2 border-primary/40 drop-shadow-[0_0_15px_rgba(147,68,25,0.45)] mb-3 block"
+            className="w-32 md:w-40 mx-auto rounded-full object-cover border-2 border-primary/40 drop-shadow-[0_0_16px_rgba(212,175,55,0.5)] mb-3 block"
             onError={(e) => {
               const target = e.target as HTMLImageElement;
               target.style.display = 'none';

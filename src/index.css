@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* Kings Barber Shop - Design System
-   Dark Mode Urbano com Cobre
+   Dark Mode Urbano com Dourado
 */
 
 @layer base {
@@ -18,8 +18,8 @@
     --popover: 24 14% 11%;
     --popover-foreground: 30 33% 95%;
 
-    --primary: 27 83% 52%;
-    --primary-foreground: 24 18% 8%;
+    --primary: 45 92% 52%;
+    --primary-foreground: 26 20% 8%;
 
     --secondary: 24 13% 18%;
     --secondary-foreground: 30 28% 90%;
@@ -27,20 +27,20 @@
     --muted: 24 11% 22%;
     --muted-foreground: 29 16% 68%;
 
-    --accent: 30 56% 40%;
-    --accent-foreground: 30 33% 96%;
+    --accent: 43 72% 40%;
+    --accent-foreground: 40 40% 96%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 95%;
 
-    --border: 25 17% 24%;
+    --border: 35 20% 24%;
     --input: 24 13% 17%;
-    --ring: 27 83% 52%;
+    --ring: 45 92% 52%;
 
     --radius: 0.75rem;
 
     /* Custom tokens */
-    --neon: 27 83% 52%;
+    --neon: 45 92% 52%;
     --neon-glow: 0 0 20px hsl(var(--neon) / 0.5);
     --neon-glow-strong: 0 0 40px hsl(var(--neon) / 0.72);
     --surface-elevated: 24 14% 13%;
@@ -56,8 +56,8 @@
     --popover: 24 14% 11%;
     --popover-foreground: 30 33% 95%;
 
-    --primary: 27 83% 52%;
-    --primary-foreground: 24 18% 8%;
+    --primary: 45 92% 52%;
+    --primary-foreground: 26 20% 8%;
 
     --secondary: 24 13% 18%;
     --secondary-foreground: 30 28% 90%;
@@ -65,15 +65,15 @@
     --muted: 24 11% 22%;
     --muted-foreground: 29 16% 68%;
 
-    --accent: 30 56% 40%;
-    --accent-foreground: 30 33% 96%;
+    --accent: 43 72% 40%;
+    --accent-foreground: 40 40% 96%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 95%;
 
-    --border: 25 17% 24%;
+    --border: 35 20% 24%;
     --input: 24 13% 17%;
-    --ring: 27 83% 52%;
+    --ring: 45 92% 52%;
   }
 }
 
@@ -121,7 +121,7 @@
     padding-right: 0.5rem;
     /* Scrollbar customizada - fina e discreta */
     scrollbar-width: thin;
-    scrollbar-color: hsl(25 30% 36% / 0.45) transparent;
+    scrollbar-color: hsl(44 55% 38% / 0.45) transparent;
     /* Suporte para touch no mobile */
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
@@ -139,20 +139,20 @@
   }
 
   .services-scroll-container::-webkit-scrollbar-thumb {
-    background: hsl(25 30% 36% / 0.35);
+    background: hsl(44 55% 38% / 0.35);
     border-radius: 10px;
     transition: background 0.2s ease;
   }
 
   .services-scroll-container::-webkit-scrollbar-thumb:hover {
-    background: hsl(27 45% 45% / 0.5);
+    background: hsl(45 78% 48% / 0.5);
   }
 
   /* Firefox */
   @-moz-document url-prefix() {
     .services-scroll-container {
       scrollbar-width: thin;
-      scrollbar-color: hsl(25 30% 36% / 0.35) transparent;
+      scrollbar-color: hsl(44 55% 38% / 0.35) transparent;
     }
   }
 }
